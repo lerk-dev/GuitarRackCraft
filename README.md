@@ -4,6 +4,12 @@
 
 ---
 
+## 致谢
+
+本版本基于 **Varcain** 的开源项目 [GuitarRackCraft](https://github.com/Varcain/GuitarRackCraft) 二次开发，由衷感谢原作者的杰出工作与无私开源。
+
+---
+
 # Guitar RackCraft 使用说明
 
 欢迎使用 **Guitar RackCraft** —— 一款在手机上模拟吉他效果器与音箱，实时演奏、录音的吉他效果器 App。
