@@ -4,11 +4,7 @@
 
 ---
 
-## 致谢
 
-本版本基于 **Varcain** 的开源项目 [GuitarRackCraft](https://github.com/Varcain/GuitarRackCraft) 二次开发，由衷感谢原作者的杰出工作与无私开源。
-
----
 
 # Guitar RackCraft 使用说明
 
@@ -285,5 +281,9 @@ App 支持 **中文 / 英文 / 跟随系统** 三种语言模式：
 内置预设只在首次启动时导入一次，删除后不会自动恢复。如需恢复，可卸载重装 App（会清空所有数据），或让朋友通过「分享」把预设发给你后再加载。
 
 ---
+## 致谢
 
+本版本基于 **Varcain** 的开源项目 [GuitarRackCraft](https://github.com/Varcain/GuitarRackCraft) 二次开发，由衷感谢原作者的杰出工作与无私开源。
+
+---
 祝演奏愉快！如果在使用中遇到问题或有改进建议，欢迎随时反馈。
