@@ -47,11 +47,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.varcain.guitarrackcraft.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +119,7 @@ fun ToneDetailScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     FilledTonalButton(onClick = { viewModel.loadToneDetail(toneId, architecture) }) {
-                        Text("Retry")
+                        Text(stringResource(R.string.common_retry))
                     }
                 }
             }
@@ -198,7 +200,7 @@ fun ToneDetailScreen(
                             ) {
                                 Icon(
                                     Icons.Default.ArrowBack,
-                                    contentDescription = "Back",
+                                    contentDescription = stringResource(R.string.common_back),
                                     tint = Color.White
                                 )
                             }
@@ -259,7 +261,7 @@ fun ToneDetailScreen(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = currentTone.user?.username ?: "Unknown",
+                                    text = currentTone.user?.username ?: stringResource(R.string.common_unknown),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -304,17 +306,17 @@ fun ToneDetailScreen(
                             StatItem(
                                 icon = Icons.Default.Layers,
                                 value = "${currentTone.modelCountFor(Architecture.fromValue(architecture))}",
-                                label = "Models"
+                                label = stringResource(R.string.tone_stat_models)
                             )
                             StatItem(
                                 icon = Icons.Default.CloudDownload,
                                 value = "${currentTone.downloads_count}",
-                                label = "Downloads"
+                                label = stringResource(R.string.tone_stat_downloads)
                             )
                             StatItem(
                                 icon = Icons.Default.Favorite,
                                 value = "${currentTone.favorites_count}",
-                                label = "Favorites"
+                                label = stringResource(R.string.tone_stat_favorites)
                             )
                         }
                     }
@@ -332,7 +334,7 @@ fun ToneDetailScreen(
                         item {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "About",
+                                    text = stringResource(R.string.tone_about),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -350,7 +352,7 @@ fun ToneDetailScreen(
                     // Models header
                     item {
                         Text(
-                            text = "Available Models",
+                            text = stringResource(R.string.tone_available_models),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
@@ -393,7 +395,7 @@ fun ToneDetailScreen(
                                         ) {
                                             Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Login to TONE3000")
+                                            Text(stringResource(R.string.tone_login_to_tone3000))
                                         }
                                     }
                                 }
@@ -524,7 +526,7 @@ fun ModelItem(
                     ) {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Load",
+                            contentDescription = stringResource(R.string.tone_load),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -541,7 +543,7 @@ fun ModelItem(
                     ) {
                         Icon(
                             Icons.Default.Check,
-                            contentDescription = "Downloaded",
+                            contentDescription = stringResource(R.string.tone_downloaded),
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -557,7 +559,7 @@ fun ModelItem(
                     ) {
                         Icon(
                             Icons.Default.Download,
-                            contentDescription = "Download",
+                            contentDescription = stringResource(R.string.tone_download),
                             modifier = Modifier.size(20.dp)
                         )
                     }

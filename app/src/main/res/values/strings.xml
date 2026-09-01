@@ -19,4 +19,303 @@
 -->
 <resources>
     <string name="app_name">Guitar RackCraft</string>
+
+    <!-- 前台音频服务通知 -->
+    <string name="audio_engine_channel_name">Audio engine</string>
+    <string name="audio_engine_channel_desc">Keeps the guitar effects engine running in the background</string>
+    <string name="audio_engine_notification_title">Guitar engine running</string>
+    <string name="audio_engine_notification_text">Effects chain is processing audio</string>
+    <string name="audio_engine_action_stop">Stop</string>
+
+    <!-- 通用 -->
+    <string name="common_back">Back</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_close">Close</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_share">Share</string>
+    <string name="common_unknown">Unknown</string>
+    <string name="common_settings">Settings</string>
+    <string name="common_ok">OK</string>
+
+    <!-- 语言选项 -->
+    <string name="lang_system">Follow System</string>
+    <string name="lang_english">English</string>
+    <string name="lang_chinese">简体中文</string>
+
+    <!-- 主界面 RackScreen -->
+    <string name="rack_status_running">Running · %.1f ms · CPU %.0f%%</string>
+    <string name="rack_status_xruns"> · XRuns %d</string>
+    <string name="rack_status_clip"> · Clip!</string>
+    <string name="rack_status_stopped">Stopped</string>
+    <string name="rack_in">In</string>
+    <string name="rack_out">Out</string>
+    <string name="rack_buffer">Buffer:</string>
+    <string name="rack_buffer_auto">Auto</string>
+    <string name="rack_more_options">More options</string>
+    <string name="rack_settings">Settings</string>
+    <string name="rack_recordings">Recordings</string>
+    <string name="rack_tone3000">TONE3000</string>
+    <string name="rack_manage_vst">Manage VST</string>
+    <string name="rack_about">About</string>
+    <string name="rack_engine_hint_prefix">Engine not running, tap </string>
+    <string name="rack_engine_hint_suffix"> Play to start the engine</string>
+    <string name="rack_dismiss">Dismiss</string>
+    <string name="rack_no_plugins">No plugins in rack</string>
+    <string name="rack_add_plugins_hint">Tap + to add plugins</string>
+    <string name="rack_options">Options</string>
+    <string name="rack_collapse">Collapse</string>
+    <string name="rack_expand">Expand</string>
+    <string name="rack_fullscreen">Fullscreen</string>
+    <string name="rack_keyboard">Keyboard</string>
+    <string name="rack_replace">Replace</string>
+    <string name="rack_remove">Remove</string>
+    <string name="rack_exit_fullscreen">Exit fullscreen</string>
+    <string name="rack_toggle_keyboard">Toggle keyboard</string>
+    <string name="rack_no_control_params">No control parameters available</string>
+    <string name="rack_browse_files">Browse files…</string>
+    <string name="rack_browse_tone3000">Browse TONE3000</string>
+    <string name="rack_favorites">Favorites</string>
+    <string name="browser_cat_distortion">Distortion</string>
+    <string name="browser_cat_amplifier">Amplifier</string>
+    <string name="browser_cat_simulator">Simulator</string>
+    <string name="browser_cat_delay">Delay</string>
+    <string name="browser_cat_modulator">Modulator</string>
+    <string name="browser_cat_filter">Filter</string>
+    <string name="browser_cat_reverb">Reverb</string>
+    <string name="browser_cat_eq">EQ</string>
+    <string name="browser_cat_compressor">Compressor</string>
+    <string name="browser_cat_pitch">Pitch</string>
+    <string name="browser_cat_dynamics">Dynamics</string>
+    <string name="browser_cat_utility">Utility</string>
+    <string name="browser_cat_other">Other</string>
+    <string name="browser_author_unknown">Unknown</string>
+    <string name="browser_author_windows_vst">Windows VST</string>
+    <string name="rack_builtin">Built-in</string>
+    <string name="rack_on_device">On device</string>
+    <string name="rack_favorite">Favorite</string>
+    <string name="rack_playback">Playback</string>
+    <string name="rack_record">Record</string>
+    <string name="rack_play">Play</string>
+    <string name="rack_stop">Stop</string>
+    <string name="rack_add">Add</string>
+    <string name="rack_presets">Presets</string>
+    <string name="rack_load_wav">Load WAV</string>
+    <string name="rack_process_through_effects">Process through effects</string>
+    <string name="rack_repeat_on">Repeat on</string>
+    <string name="rack_repeat_off">Repeat off</string>
+    <string name="rack_restart">Restart</string>
+    <string name="rack_pause">Pause</string>
+    <string name="rack_unload">Unload</string>
+    <string name="rack_engine_needed_for_wav">Start the engine to load a WAV file</string>
+    <string name="rack_wav_default">WAV</string>
+    <string name="rack_recently_used">Recently Used</string>
+    <string name="rack_clear">Clear</string>
+    <string name="rack_share_preset">Share preset</string>
+    <string name="rack_all_presets">All Presets</string>
+    <string name="rack_no_saved_presets">No saved presets</string>
+    <string name="rack_save_current_preset">Save Current Preset</string>
+    <string name="rack_save_preset">Save Preset</string>
+    <string name="rack_preset_name">Preset name</string>
+    <string name="rack_preset_overwrite_warn">A preset with this name exists and will be overwritten</string>
+    <string name="rack_overwrite">Overwrite</string>
+    <string name="rack_save">Save</string>
+    <string name="rack_select_recording">Select Recording</string>
+    <string name="rack_no_recordings">No recordings available.</string>
+    <string name="rack_raw">Raw</string>
+    <string name="rack_processed">Processed</string>
+
+    <!-- 关于对话框 AboutDialog -->
+    <string name="about_build">Build: %1$s %2$s · %3$s</string>
+    <string name="about_license">This app is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License (GPL).</string>
+
+    <!-- RackViewModel 消息 -->
+    <string name="rack_err_start_engine">Failed to start engine: %1$s</string>
+    <string name="rack_err_engine_audio_fail">audio engine failed to start</string>
+    <string name="rack_engine_banner_pre">Engine not running, tap </string>
+    <string name="rack_engine_banner_post"> Play to start the engine</string>
+    <string name="rack_err_record_need_engine">Start the engine first to record</string>
+    <string name="rack_err_start_recording">Failed to start recording</string>
+    <string name="rack_err_remove_plugin_pos">Failed to remove plugin at position %1$d</string>
+    <string name="rack_err_remove_plugin">Failed to remove plugin: %1$s</string>
+    <string name="rack_err_reorder_plugins">Failed to reorder plugins</string>
+    <string name="rack_err_reorder_plugins_msg">Failed to reorder plugins: %1$s</string>
+    <string name="rack_err_load_wav">Failed to load WAV file</string>
+    <string name="rack_err_load_wav_msg">Failed to load WAV: %1$s</string>
+    <string name="rack_err_set_file_path">Failed to set file path: %1$s</string>
+    <string name="rack_err_set_parameter">Failed to set parameter: %1$s</string>
+    <string name="rack_err_get_rack_plugins">Failed to get rack plugins: %1$s</string>
+    <string name="rack_op_saving_preset">Saving preset</string>
+    <string name="rack_op_loading_preset">Loading preset</string>
+    <string name="rack_preset_saved">Preset \'%1$s\' saved</string>
+    <string name="rack_preset_save_failed">Failed to save preset</string>
+    <string name="rack_preset_loaded">Preset \'%1$s\' loaded</string>
+    <string name="rack_preset_load_failed_mismatch">Failed to load preset (plugin count mismatch?)</string>
+    <string name="rack_recording_preset_loaded">Recording preset loaded</string>
+    <string name="rack_recording_preset_failed">Failed to load recording preset</string>
+    <string name="rack_preset_deleted">Preset \'%1$s\' deleted</string>
+
+    <!-- PluginBrowserViewModel 消息 -->
+    <string name="browser_err_load_plugins">Failed to load plugins: %1$s</string>
+    <string name="browser_err_add_no_binaries">Could not add plugin. Plugin binaries (.so) are not included in this build—only metadata is available.</string>
+    <string name="browser_err_add_plugin">Failed to add plugin: %1$s</string>
+    <string name="browser_err_replace_plugin">Failed to replace plugin: %1$s</string>
+    <string name="browser_op_adding_plugin">Adding plugin</string>
+    <string name="browser_op_replacing_plugin">Replacing plugin</string>
+
+    <!-- TONE3000 ViewModel 消息 -->
+    <string name="tone_err_fetch_tone_data">Failed to fetch tone data</string>
+    <string name="tone_err_no_compatible_models">No compatible models found for this tone</string>
+    <string name="tone_err_auth_failed">Authentication failed (no session)</string>
+    <string name="tone_err_download_failed_msg">Download failed: %1$s</string>
+
+    <!-- 音频设备类型 Audio device types -->
+    <string name="device_type_builtin_mic">Built-in Mic</string>
+    <string name="device_type_builtin_speaker">Built-in Speaker</string>
+    <string name="device_type_builtin_earpiece">Earpiece</string>
+    <string name="device_type_wired_headset">Wired Headset</string>
+    <string name="device_type_wired_headphones">Wired Headphones</string>
+    <string name="device_type_usb_device">USB Device</string>
+    <string name="device_type_usb_accessory">USB Accessory</string>
+    <string name="device_type_usb_headset">USB Headset</string>
+    <string name="device_type_bluetooth_sco">Bluetooth SCO</string>
+    <string name="device_type_bluetooth_a2dp">Bluetooth A2DP</string>
+    <string name="device_type_telephony">Telephony</string>
+    <string name="device_type_aux_line">Aux Line</string>
+    <string name="device_type_hdmi">HDMI</string>
+    <string name="device_type_hdmi_arc">HDMI ARC</string>
+    <string name="device_type_audio_device">Audio Device</string>
+
+    <!-- 插件浏览器 PluginBrowserScreen -->
+    <string name="browser_title">Plugin Browser</string>
+    <string name="browser_refresh">Refresh</string>
+    <string name="browser_unknown_error">Unknown error</string>
+    <string name="browser_no_plugins">No plugins available</string>
+    <string name="browser_empty_hint">LV2 plugins are loaded from the app\'s extracted assets (assets/lv2). This app ships with GxPlugins in assets—if you see nothing here, the native build may be using the LV2 stub (no lilv/serd/sord). Build the LV2 libraries and place them in app/src/main/cpp/libs/lv2/, then rebuild the app. See LV2_INTEGRATION.md.</string>
+    <string name="browser_plugin_count">%1$d plugins</string>
+    <string name="browser_plugin_thumbnail">Plugin thumbnail</string>
+    <string name="browser_add_favorites">Add to favorites</string>
+    <string name="browser_remove_favorites">Remove from favorites</string>
+
+    <!-- 录音 RecordingsScreen -->
+    <string name="rec_title">Recordings</string>
+    <string name="rec_empty">No recordings yet.\nUse the Record button to capture audio.</string>
+    <string name="rec_share_chooser">Share Recording</string>
+    <string name="rec_delete_title">Delete Recording</string>
+    <string name="rec_delete_text">Delete recording from %1$s? This cannot be undone.</string>
+    <string name="rec_play_raw">Play Raw</string>
+    <string name="rec_play_processed">Play Processed</string>
+    <string name="rec_preset">Preset</string>
+    <string name="rec_load_preset">Load Preset</string>
+    <string name="rec_share_preset">Share Preset</string>
+    <string name="rec_share_preset_chooser">Share Preset</string>
+    <string name="rec_duration">Duration: %1$d:%2$02d</string>
+
+    <!-- TONE3000 Tone3000Screen -->
+    <string name="tone_title">TONE3000</string>
+    <string name="tone_authenticated">Authenticated</string>
+    <string name="tone_logout">Logout</string>
+    <string name="tone_login">Login</string>
+    <string name="tone_search_placeholder">Search tones...</string>
+    <string name="tone_filters">Filters</string>
+    <string name="tone_sort">Sort</string>
+    <string name="tone_browse_title">Browse thousands of tones</string>
+    <string name="tone_login_prompt">Sign in with your TONE3000 account to discover and download amp models, IRs, and more.</string>
+    <string name="tone_login_button">Login with TONE3000</string>
+    <string name="tone_error_default">Something went wrong</string>
+    <string name="tone_clear_all">Clear All</string>
+    <string name="tone_apply_filters">Apply</string>
+    <string name="tone_section_gear">Gear</string>
+    <string name="tone_gear_amp_head">Amp Head</string>
+    <string name="tone_gear_amp_cab">Amp Cab / Combo</string>
+    <string name="tone_gear_pedal">Pedal</string>
+    <string name="tone_gear_outboard">Outboard</string>
+    <string name="tone_section_format">Format</string>
+    <string name="tone_section_tags">Tags</string>
+    <string name="tone_section_size">Model Size</string>
+    <string name="tone_section_architecture">Architecture</string>
+    <string name="tone_section_calibrated">Calibrated</string>
+    <string name="tone_yes">Yes</string>
+    <string name="tone_no">No</string>
+    <string name="tone_select_model">Select Model</string>
+    <string name="tone_load">Load</string>
+    <string name="tone_downloaded">Downloaded</string>
+    <string name="tone_download">Download</string>
+    <string name="tone_models_count">%1$d models</string>
+    <string name="tone_downloading">Downloading %1$s...</string>
+    <string name="tone_downloading_percent">Downloading %1$s... %2$d%%</string>
+    <string name="tone_downloading_mb">Downloading %1$s... %2$d MB</string>
+    <string name="tone_failed_load_tones">Failed to load tones</string>
+    <string name="tone_failed_load_tones_nodata">Failed to load tones (no data)</string>
+    <string name="tone_failed_load_more">Failed to load more tones</string>
+    <string name="tone_failed_download">Download failed</string>
+    <string name="tone_failed_download_file">Failed to download model file</string>
+    <string name="tone_failed_tone_info">Failed to load tone info</string>
+    <string name="tone_failed_models_list">Failed to load models list</string>
+    <string name="tone_err_no_details">No details</string>
+    <string name="tone_err_api_format">%1$s: %2$s</string>
+    <string name="tone_err_network_format">%1$s: Network error - %2$s</string>
+    <string name="tone_err_fetch_models">Fetch models failed</string>
+    <string name="tone_err_fetch_user">Fetch user failed</string>
+    <string name="tone_err_auth">Authentication failed</string>
+    <string name="tone_downloaded_file">Tone downloaded: %1$s</string>
+    <string name="tone_loaded_into_rack">Tone %1$s loaded into rack</string>
+    <string name="tone_login_success">Logged in successfully</string>
+    <string name="tone_logout_success">Logged out</string>
+    <string name="tone_detail_no_models">No models available for this tone</string>
+    <string name="tone_detail_login_required">Please login to view and download models</string>
+    <string name="tone_model_downloaded">Model downloaded: %1$s</string>
+    <string name="tone_model_loaded">Model loaded into rack</string>
+    <string name="tone_model_not_on_disk">Model file not found on disk</string>
+    <string name="tone_already_downloaded">Already downloaded</string>
+    <string name="tone_source_plugin_removed">Source plugin was removed</string>
+
+    <!-- TONE3000 详情 ToneDetailScreen -->
+    <string name="tone_stat_models">Models</string>
+    <string name="tone_stat_downloads">Downloads</string>
+    <string name="tone_stat_favorites">Favorites</string>
+    <string name="tone_about">About</string>
+    <string name="tone_available_models">Available Models</string>
+    <string name="tone_login_to_tone3000">Login to TONE3000</string>
+
+    <!-- 音频设置 AudioSettingsScreen -->
+    <string name="settings_title">Audio Settings</string>
+    <string name="settings_input_device">Input Device</string>
+    <string name="settings_output_device">Output Device</string>
+    <string name="settings_buffer_size">Buffer Size</string>
+    <string name="settings_buffer_hint">Lower buffer sizes reduce latency but increase CPU usage. Use Auto unless you experience issues.</string>
+    <string name="settings_default_device">Default</string>
+    <string name="settings_current_session">Current Session</string>
+    <string name="settings_sample_rate">Sample Rate</string>
+    <string name="settings_burst_size">Burst Size</string>
+    <string name="settings_audio_format">Audio Format</string>
+    <string name="settings_32bit_float">32-bit Float</string>
+    <string name="settings_low_latency_checklist">Low-Latency Checklist</string>
+    <string name="settings_checklist_ref">Based on developer.android.com/games/sdk/oboe/low-latency-audio</string>
+    <string name="settings_oboe_api">Oboe API</string>
+    <string name="settings_aaudio_backend">AAudio backend</string>
+    <string name="settings_perf_low_latency">Performance: Low Latency</string>
+    <string name="settings_sharing_exclusive_output">Sharing: Exclusive (output)</string>
+    <string name="settings_sharing_exclusive_input">Sharing: Exclusive (input)</string>
+    <string name="settings_sample_rate_48000">Sample rate: 48000 Hz</string>
+    <string name="settings_data_callback">Data callback</string>
+    <string name="settings_mmap_buffer">MMAP buffer</string>
+    <string name="settings_language">Language</string>
+
+    <!-- 启动/插件解压 PluginExtractScreen -->
+    <string name="extract_preparing">Preparing plugins (%1$d / %2$d)</string>
+    <string name="extract_initializing">Initializing...</string>
+
+    <!-- modgui ModguiScreen -->
+    <string name="modgui_not_found">Plugin not found</string>
+    <string name="modgui_no_ui">No modgui UI for this plugin</string>
+
+    <!-- 模型选择器 Model picker -->
+    <string name="model_picker_no_model">No model loaded</string>
+    <string name="model_picker_no_ir">No IR loaded</string>
+    <string name="model_picker_title_model">Select Model</string>
+    <string name="model_picker_title_aida_x">Select AIDA-X Model</string>
+    <string name="model_picker_title_ir">Select Impulse Response</string>
+    <string name="model_picker_title_neural">Select Neural Model</string>
+    <string name="model_picker_title_file">Select File</string>
 </resources>

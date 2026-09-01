@@ -20,8 +20,11 @@
 package com.varcain.guitarrackcraft.ui.tone3000
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.varcain.guitarrackcraft.R
+import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.engine.NativeEngine
 import com.varcain.guitarrackcraft.engine.RackManager
 import com.varcain.guitarrackcraft.engine.X11Bridge
@@ -35,6 +38,9 @@ import java.io.IOException
 class Tone3000ViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
     private val api = Tone3000Api(tokenManager)
+
+    /** 按当前应用语言返回包装后的上下文，用于解析本地化字符串。 */
+    private fun ctx(): Context = LanguageManager.wrapContext(getApplication())
 
     private val _downloadStatus = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val downloadStatus = _downloadStatus.asSharedFlow()
@@ -147,11 +153,12 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun handleApiError(e: Exception, prefix: String) {
+    private fun handleApiError(e: Exception, prefixRes: Int) {
+        val prefix = ctx().getString(prefixRes)
         val msg = when (e) {
-            is ApiException -> "$prefix: ${e.code} ${e.errorBody ?: "No details"}"
-            is IOException -> "$prefix: Network error - ${e.message}"
-            else -> "$prefix: ${e.message}"
+            is ApiException -> ctx().getString(R.string.tone_err_api_format, prefix, "${e.code} ${e.errorBody ?: ctx().getString(R.string.tone_err_no_details)}")
+            is IOException -> ctx().getString(R.string.tone_err_network_format, prefix, e.message ?: "")
+            else -> ctx().getString(R.string.tone_err_api_format, prefix, e.message ?: "")
         }
         _error.value = msg
         _toastMessage.tryEmit(msg)
@@ -217,12 +224,12 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                     api.getModels(tone.id, pageSize, architecture?.value)
                 }
                 if (models.isNullOrEmpty()) {
-                    _toastMessage.emit("No models found for this tone")
+                    _toastMessage.emit(ctx().getString(R.string.tone_err_no_compatible_models))
                 } else {
                     _modelsForTone.value = tone to models
                 }
             } catch (e: Exception) {
-                handleApiError(e, "Fetch models failed")
+                handleApiError(e, R.string.tone_err_fetch_models)
             } finally {
                 _isLoading.value = false
             }
@@ -240,7 +247,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
             try {
                 processDownload(tone, listOf(model), model)
             } catch (e: Exception) {
-                handleApiError(e, "Download failed")
+                handleApiError(e, R.string.tone_failed_download)
             } finally {
                 _isLoading.value = false
             }
@@ -256,7 +263,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                     api.getToneFromUrl(toneUrl, architecture?.value)
                 }
                 if (tone == null) {
-                    _error.value = "Failed to fetch tone data"
+                    _error.value = ctx().getString(R.string.tone_err_fetch_tone_data)
                     _isLoading.value = false
                     return@launch
                 }
@@ -266,14 +273,14 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                     api.getModels(tone.id, pageSize, architecture?.value)
                 }
                 if (models.isNullOrEmpty()) {
-                    _error.value = "No compatible models found for this tone"
+                    _error.value = ctx().getString(R.string.tone_err_no_compatible_models)
                     _isLoading.value = false
                     return@launch
                 }
 
                 processDownload(tone, models, useAutoFind = true)
             } catch (e: Exception) {
-                handleApiError(e, "Download failed")
+                handleApiError(e, R.string.tone_failed_download)
             } finally {
                 _isLoading.value = false
             }
@@ -294,7 +301,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
         } ?: candidateModels.firstOrNull()
 
         if (model == null) {
-            _error.value = "No compatible models found for this tone"
+            _error.value = ctx().getString(R.string.tone_err_no_compatible_models)
             return
         }
 
@@ -303,13 +310,21 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
         val destFile = fileInfo.resolveFile(filesDir)
         destFile.parentFile?.mkdirs()
 
-        _downloadStatus.emit("Downloading ${tone.title}...")
+        _downloadStatus.emit(ctx().getString(R.string.tone_downloading, tone.title))
         val success = withContext(Dispatchers.IO) {
-            api.downloadFile(model.model_url, destFile)
+            api.downloadFile(model.model_url, destFile) { done, total ->
+                // 进度文案：优先百分比，总长未知时显示 MB
+                val text = if (total > 0) {
+                    ctx().getString(R.string.tone_downloading_percent, tone.title, done * 100 / total)
+                } else {
+                    ctx().getString(R.string.tone_downloading_mb, tone.title, done / 1024 / 1024)
+                }
+                _downloadStatus.tryEmit(text)
+            }
         }
 
         if (success) {
-            _downloadStatus.emit("Tone downloaded: ${destFile.name}")
+            _downloadStatus.emit(ctx().getString(R.string.tone_downloaded_file, destFile.name))
             _downloadedModelIds.value = _downloadedModelIds.value + model.id
 
             // If it's AIDA-X, also copy to neural_models so NAM can see it
@@ -335,12 +350,12 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                 if (targetPluginIndex >= 0) {
                     val slot = if (_sourcePluginIndex >= 0) _sourceSlot else null
                     loadFileIntoPlugin(targetPluginIndex, fileInfo, destFile, slot)
-                    _downloadStatus.emit("Tone ${tone.title} loaded into rack")
+                    _downloadStatus.emit(ctx().getString(R.string.tone_loaded_into_rack, tone.title))
                 }
             }
             // When _sourcePluginIndex == -1 and !useAutoFind: download only, no auto-load
         } else {
-            _error.value = "Failed to download model file"
+            _error.value = ctx().getString(R.string.tone_failed_download_file)
         }
     }
 
@@ -390,23 +405,23 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
             val destFile = fileInfo.resolveFile(filesDir)
 
             if (!destFile.exists()) {
-                _toastMessage.tryEmit("Model file not found on disk")
+                _toastMessage.tryEmit(ctx().getString(R.string.tone_model_not_on_disk))
                 return@launch
             }
 
             if (_sourcePluginIndex < 0) {
-                _toastMessage.tryEmit("Already downloaded")
+                _toastMessage.tryEmit(ctx().getString(R.string.tone_already_downloaded))
                 return@launch
             }
 
             val pluginInfo = RackManager.getRackPluginInfo(_sourcePluginIndex)
             if (pluginInfo == null) {
-                _toastMessage.tryEmit("Source plugin was removed")
+                _toastMessage.tryEmit(ctx().getString(R.string.tone_source_plugin_removed))
                 return@launch
             }
 
             loadFileIntoPlugin(_sourcePluginIndex, fileInfo, destFile, _sourceSlot)
-            _downloadStatus.tryEmit("Model loaded into rack")
+            _downloadStatus.tryEmit(ctx().getString(R.string.tone_model_loaded))
         }
     }
 
@@ -420,7 +435,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                 if (e is ApiException && e.code == 401) {
                     logout()
                 }
-                handleApiError(e, "Fetch user failed")
+                handleApiError(e, R.string.tone_err_fetch_user)
             }
         }
     }
@@ -436,14 +451,14 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                     tokenManager.accessToken = session.access_token
                     tokenManager.refreshToken = session.refresh_token
                     _isAuthenticated.value = true
-                    _toastMessage.emit("Logged in successfully")
+                    _toastMessage.emit(ctx().getString(R.string.tone_login_success))
                     fetchUser()
                     searchTones() // Refresh search with auth
                 } else {
-                    _error.value = "Authentication failed (no session)"
+                    _error.value = ctx().getString(R.string.tone_err_auth_failed)
                 }
             } catch (e: Exception) {
-                handleApiError(e, "Authentication failed")
+                handleApiError(e, R.string.tone_err_auth)
             } finally {
                 _isLoading.value = false
             }
@@ -454,7 +469,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
         tokenManager.clear()
         _isAuthenticated.value = false
         _user.value = null
-        _toastMessage.tryEmit("Logged out")
+        _toastMessage.tryEmit(ctx().getString(R.string.tone_logout_success))
         searchTones()
     }
 
@@ -519,10 +534,10 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                 } else {
-                    _error.value = "Failed to load tones (no data)"
+                    _error.value = ctx().getString(R.string.tone_failed_load_tones_nodata)
                 }
             } catch (e: Exception) {
-                handleApiError(e, "Failed to load tones")
+                handleApiError(e, R.string.tone_failed_load_tones)
             } finally {
                 _isLoading.value = false
             }
@@ -580,7 +595,7 @@ class Tone3000ViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             } catch (e: Exception) {
-                handleApiError(e, "Failed to load more tones")
+                handleApiError(e, R.string.tone_failed_load_more)
             } finally {
                 _isLoading.value = false
             }

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "presetName": "Hotel California (Eagles)",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+    "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_JCM2000_Crunch.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.7 },
+        { "index": 1, "value": 0.03 },
+        { "index": 2, "value": 0.6 },
+        { "index": 3, "value": 1.8 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": -14.0 },
+        { "index": 2, "value": 480.0 },
+        { "index": 3, "value": -14.0 },
+        { "index": 4, "value": 480.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

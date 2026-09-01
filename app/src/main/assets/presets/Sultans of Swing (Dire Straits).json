@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "presetName": "Sultans of Swing (Dire Straits)",
+  "timestamp": 1787900002000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 4.0 },
+        { "index": 1, "value": 6.0 },
+        { "index": 2, "value": -12.0 },
+        { "index": 3, "value": 0.5 },
+        { "index": 4, "value": 0.002 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_Fender_TwinVerb_Vibrato_Bright.nam"
+        }
+      ]
+    }
+  ]
+}

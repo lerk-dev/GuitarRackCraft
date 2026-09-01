@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2026 Kamil Lulko <kamil.lulko@gmail.com>
+
+  This file is part of Guitar RackCraft.
+
+  Guitar RackCraft is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Guitar RackCraft is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Guitar RackCraft. If not, see <https://www.gnu.org/licenses/>.
+
+  简体中文翻译。
+-->
+<resources>
+    <string name="app_name">Guitar RackCraft</string>
+
+    <!-- 前台音频服务通知 -->
+    <string name="audio_engine_channel_name">音频引擎</string>
+    <string name="audio_engine_channel_desc">在后台保持吉他效果器引擎运行</string>
+    <string name="audio_engine_notification_title">吉他引擎运行中</string>
+    <string name="audio_engine_notification_text">效果链正在处理音频</string>
+    <string name="audio_engine_action_stop">停止</string>
+
+    <!-- 通用 -->
+    <string name="common_back">返回</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_close">关闭</string>
+    <string name="common_retry">重试</string>
+    <string name="common_delete">删除</string>
+    <string name="common_share">分享</string>
+    <string name="common_unknown">未知</string>
+    <string name="common_settings">设置</string>
+    <string name="common_ok">确定</string>
+
+    <!-- 语言选项 -->
+    <string name="lang_system">跟随系统</string>
+    <string name="lang_english">English</string>
+    <string name="lang_chinese">简体中文</string>
+
+    <!-- 主界面 RackScreen -->
+    <string name="rack_status_running">运行中 · %.1f 毫秒 · CPU %.0f%%</string>
+    <string name="rack_status_xruns"> · 缓冲不足 %d 次</string>
+    <string name="rack_status_clip"> · 削波!</string>
+    <string name="rack_status_stopped">已停止</string>
+    <string name="rack_in">输入</string>
+    <string name="rack_out">输出</string>
+    <string name="rack_buffer">缓冲:</string>
+    <string name="rack_buffer_auto">自动</string>
+    <string name="rack_more_options">更多选项</string>
+    <string name="rack_settings">设置</string>
+    <string name="rack_recordings">录音</string>
+    <string name="rack_tone3000">TONE3000</string>
+    <string name="rack_manage_vst">管理 VST</string>
+    <string name="rack_about">关于</string>
+    <string name="rack_engine_hint_prefix">引擎未运行，点击 </string>
+    <string name="rack_engine_hint_suffix"> 开始播放以启动引擎</string>
+    <string name="rack_dismiss">关闭</string>
+    <string name="rack_no_plugins">效果链中没有插件</string>
+    <string name="rack_add_plugins_hint">点击 + 添加插件</string>
+    <string name="rack_options">选项</string>
+    <string name="rack_collapse">收起</string>
+    <string name="rack_expand">展开</string>
+    <string name="rack_fullscreen">全屏</string>
+    <string name="rack_keyboard">键盘</string>
+    <string name="rack_replace">替换</string>
+    <string name="rack_remove">移除</string>
+    <string name="rack_exit_fullscreen">退出全屏</string>
+    <string name="rack_toggle_keyboard">切换键盘</string>
+    <string name="rack_no_control_params">没有可用的控制参数</string>
+    <string name="rack_browse_files">浏览文件…</string>
+    <string name="rack_browse_tone3000">浏览 TONE3000</string>
+    <string name="rack_favorites">收藏</string>
+    <string name="browser_cat_distortion">失真</string>
+    <string name="browser_cat_amplifier">音箱</string>
+    <string name="browser_cat_simulator">模拟器</string>
+    <string name="browser_cat_delay">延迟</string>
+    <string name="browser_cat_modulator">调制器</string>
+    <string name="browser_cat_filter">滤波</string>
+    <string name="browser_cat_reverb">混响</string>
+    <string name="browser_cat_eq">均衡器</string>
+    <string name="browser_cat_compressor">压缩器</string>
+    <string name="browser_cat_pitch">音高</string>
+    <string name="browser_cat_dynamics">动态</string>
+    <string name="browser_cat_utility">工具</string>
+    <string name="browser_cat_other">其他</string>
+    <string name="browser_author_unknown">未知</string>
+    <string name="browser_author_windows_vst">Windows VST</string>
+    <string name="rack_builtin">内置</string>
+    <string name="rack_on_device">设备本地</string>
+    <string name="rack_favorite">收藏</string>
+    <string name="rack_playback">播放</string>
+    <string name="rack_record">录音</string>
+    <string name="rack_play">播放</string>
+    <string name="rack_stop">停止</string>
+    <string name="rack_add">添加</string>
+    <string name="rack_presets">预设</string>
+    <string name="rack_load_wav">载入 WAV</string>
+    <string name="rack_process_through_effects">经效果器处理</string>
+    <string name="rack_repeat_on">循环开</string>
+    <string name="rack_repeat_off">循环关</string>
+    <string name="rack_restart">重新开始</string>
+    <string name="rack_pause">暂停</string>
+    <string name="rack_unload">卸载</string>
+    <string name="rack_engine_needed_for_wav">请先启动引擎再载入 WAV 文件</string>
+    <string name="rack_wav_default">WAV</string>
+    <string name="rack_recently_used">最近使用</string>
+    <string name="rack_clear">清除</string>
+    <string name="rack_share_preset">分享预设</string>
+    <string name="rack_all_presets">全部预设</string>
+    <string name="rack_no_saved_presets">暂无已保存的预设</string>
+    <string name="rack_save_current_preset">保存当前预设</string>
+    <string name="rack_save_preset">保存预设</string>
+    <string name="rack_preset_name">预设名称</string>
+    <string name="rack_preset_overwrite_warn">已存在同名预设，保存将覆盖</string>
+    <string name="rack_overwrite">覆盖</string>
+    <string name="rack_save">保存</string>
+    <string name="rack_select_recording">选择录音</string>
+    <string name="rack_no_recordings">暂无可用录音。</string>
+    <string name="rack_raw">原始</string>
+    <string name="rack_processed">处理后</string>
+
+    <!-- 关于对话框 AboutDialog -->
+    <string name="about_build">构建：%1$s %2$s · %3$s</string>
+    <string name="about_license">本应用是自由软件：您可以依据自由软件基金会发布的 GNU 通用公共许可证（GPL）的条款重新分发和/或修改它。</string>
+
+    <!-- RackViewModel 消息 -->
+    <string name="rack_err_start_engine">启动引擎失败：%1$s</string>
+    <string name="rack_err_engine_audio_fail">音频引擎启动失败</string>
+    <string name="rack_engine_banner_pre">引擎未运行，点击 </string>
+    <string name="rack_engine_banner_post"> 播放按钮启动引擎</string>
+    <string name="rack_err_record_need_engine">请先启动引擎再录音</string>
+    <string name="rack_err_start_recording">启动录音失败</string>
+    <string name="rack_err_remove_plugin_pos">移除位置 %1$d 的插件失败</string>
+    <string name="rack_err_remove_plugin">移除插件失败：%1$s</string>
+    <string name="rack_err_reorder_plugins">重新排序插件失败</string>
+    <string name="rack_err_reorder_plugins_msg">重新排序插件失败：%1$s</string>
+    <string name="rack_err_load_wav">加载 WAV 文件失败</string>
+    <string name="rack_err_load_wav_msg">加载 WAV 失败：%1$s</string>
+    <string name="rack_err_set_file_path">设置文件路径失败：%1$s</string>
+    <string name="rack_err_set_parameter">设置参数失败：%1$s</string>
+    <string name="rack_err_get_rack_plugins">获取效果链插件失败：%1$s</string>
+    <string name="rack_op_saving_preset">正在保存预设</string>
+    <string name="rack_op_loading_preset">正在加载预设</string>
+    <string name="rack_preset_saved">预设“%1$s”已保存</string>
+    <string name="rack_preset_save_failed">保存预设失败</string>
+    <string name="rack_preset_loaded">预设“%1$s”已加载</string>
+    <string name="rack_preset_load_failed_mismatch">加载预设失败（插件数量不匹配？）</string>
+    <string name="rack_recording_preset_loaded">录音预设已加载</string>
+    <string name="rack_recording_preset_failed">加载录音预设失败</string>
+    <string name="rack_preset_deleted">预设“%1$s”已删除</string>
+
+    <!-- PluginBrowserViewModel 消息 -->
+    <string name="browser_err_load_plugins">加载插件失败：%1$s</string>
+    <string name="browser_err_add_no_binaries">无法添加插件。此构建未包含插件二进制文件（.so），仅提供元数据。</string>
+    <string name="browser_err_add_plugin">添加插件失败：%1$s</string>
+    <string name="browser_err_replace_plugin">替换插件失败：%1$s</string>
+    <string name="browser_op_adding_plugin">正在添加插件</string>
+    <string name="browser_op_replacing_plugin">正在替换插件</string>
+
+    <!-- TONE3000 ViewModel 消息 -->
+    <string name="tone_err_fetch_tone_data">获取音色数据失败</string>
+    <string name="tone_err_no_compatible_models">此音色未找到兼容的模型</string>
+    <string name="tone_err_auth_failed">认证失败（无会话）</string>
+    <string name="tone_err_download_failed_msg">下载失败：%1$s</string>
+
+    <!-- 音频设备类型 Audio device types -->
+    <string name="device_type_builtin_mic">内置麦克风</string>
+    <string name="device_type_builtin_speaker">内置扬声器</string>
+    <string name="device_type_builtin_earpiece">听筒</string>
+    <string name="device_type_wired_headset">有线耳麦</string>
+    <string name="device_type_wired_headphones">有线耳机</string>
+    <string name="device_type_usb_device">USB 设备</string>
+    <string name="device_type_usb_accessory">USB 配件</string>
+    <string name="device_type_usb_headset">USB 耳机</string>
+    <string name="device_type_bluetooth_sco">蓝牙 SCO</string>
+    <string name="device_type_bluetooth_a2dp">蓝牙 A2DP</string>
+    <string name="device_type_telephony">电话</string>
+    <string name="device_type_aux_line">辅助线路</string>
+    <string name="device_type_hdmi">HDMI</string>
+    <string name="device_type_hdmi_arc">HDMI ARC</string>
+    <string name="device_type_audio_device">音频设备</string>
+
+    <!-- 插件浏览器 PluginBrowserScreen -->
+    <string name="browser_title">插件浏览器</string>
+    <string name="browser_refresh">刷新</string>
+    <string name="browser_unknown_error">未知错误</string>
+    <string name="browser_no_plugins">没有可用插件</string>
+    <string name="browser_empty_hint">LV2 插件从应用的解压资源（assets/lv2）加载。本应用内置了 GxPlugins——如果这里没有内容，说明原生构建可能使用了 LV2 桩实现（缺少 lilv/serd/sord）。构建 LV2 库并放到 app/src/main/cpp/libs/lv2/ 后重新构建应用。参见 LV2_INTEGRATION.md。</string>
+    <string name="browser_plugin_count">%1$d 个插件</string>
+    <string name="browser_plugin_thumbnail">插件缩略图</string>
+    <string name="browser_add_favorites">加入收藏</string>
+    <string name="browser_remove_favorites">取消收藏</string>
+
+    <!-- 录音 RecordingsScreen -->
+    <string name="rec_title">录音</string>
+    <string name="rec_empty">暂无录音。\n点击录音按钮开始录制。</string>
+    <string name="rec_share_chooser">分享录音</string>
+    <string name="rec_delete_title">删除录音</string>
+    <string name="rec_delete_text">确定删除 %1$s 的录音？此操作不可撤销。</string>
+    <string name="rec_play_raw">播放原始</string>
+    <string name="rec_play_processed">播放处理</string>
+    <string name="rec_preset">预设</string>
+    <string name="rec_load_preset">载入预设</string>
+    <string name="rec_share_preset">分享预设</string>
+    <string name="rec_share_preset_chooser">分享预设</string>
+    <string name="rec_duration">时长: %1$d:%2$02d</string>
+
+    <!-- TONE3000 Tone3000Screen -->
+    <string name="tone_title">TONE3000</string>
+    <string name="tone_authenticated">已登录</string>
+    <string name="tone_logout">退出登录</string>
+    <string name="tone_login">登录</string>
+    <string name="tone_search_placeholder">搜索音色…</string>
+    <string name="tone_filters">筛选</string>
+    <string name="tone_sort">排序</string>
+    <string name="tone_browse_title">浏览数千款音色</string>
+    <string name="tone_login_prompt">使用 TONE3000 账号登录，发现并下载箱头模型、脉冲响应等更多内容。</string>
+    <string name="tone_login_button">使用 TONE3000 登录</string>
+    <string name="tone_error_default">出错了</string>
+    <string name="tone_clear_all">全部清除</string>
+    <string name="tone_apply_filters">确定</string>
+    <string name="tone_section_gear">设备</string>
+    <string name="tone_gear_amp_head">箱头</string>
+    <string name="tone_gear_amp_cab">箱体 / 一体箱</string>
+    <string name="tone_gear_pedal">效果器</string>
+    <string name="tone_gear_outboard">外置设备</string>
+    <string name="tone_section_format">格式</string>
+    <string name="tone_section_tags">标签</string>
+    <string name="tone_section_size">模型大小</string>
+    <string name="tone_section_architecture">架构</string>
+    <string name="tone_section_calibrated">已校准</string>
+    <string name="tone_yes">是</string>
+    <string name="tone_no">否</string>
+    <string name="tone_select_model">选择模型</string>
+    <string name="tone_load">载入</string>
+    <string name="tone_downloaded">已下载</string>
+    <string name="tone_download">下载</string>
+    <string name="tone_models_count">%1$d 个模型</string>
+    <string name="tone_downloading">正在下载 %1$s…</string>
+    <string name="tone_downloading_percent">正在下载 %1$s… %2$d%%</string>
+    <string name="tone_downloading_mb">正在下载 %1$s… %2$d MB</string>
+    <string name="tone_failed_load_tones">音色加载失败</string>
+    <string name="tone_failed_load_tones_nodata">音色加载失败（无数据）</string>
+    <string name="tone_failed_load_more">更多音色加载失败</string>
+    <string name="tone_failed_download">下载失败</string>
+    <string name="tone_failed_download_file">模型文件下载失败</string>
+    <string name="tone_failed_tone_info">音色信息加载失败</string>
+    <string name="tone_failed_models_list">模型列表加载失败</string>
+    <string name="tone_err_no_details">无详细信息</string>
+    <string name="tone_err_api_format">%1$s：%2$s</string>
+    <string name="tone_err_network_format">%1$s：网络错误 - %2$s</string>
+    <string name="tone_err_fetch_models">获取模型失败</string>
+    <string name="tone_err_fetch_user">获取用户信息失败</string>
+    <string name="tone_err_auth">认证失败</string>
+    <string name="tone_downloaded_file">音色已下载：%1$s</string>
+    <string name="tone_loaded_into_rack">音色“%1$s”已载入效果链</string>
+    <string name="tone_login_success">登录成功</string>
+    <string name="tone_logout_success">已退出登录</string>
+    <string name="tone_detail_no_models">此音色暂无可用模型</string>
+    <string name="tone_detail_login_required">请登录后查看和下载模型</string>
+    <string name="tone_model_downloaded">模型已下载：%1$s</string>
+    <string name="tone_model_loaded">模型已载入效果链</string>
+    <string name="tone_model_not_on_disk">磁盘上未找到模型文件</string>
+    <string name="tone_already_downloaded">已下载</string>
+    <string name="tone_source_plugin_removed">来源插件已被移除</string>
+
+    <!-- TONE3000 详情 ToneDetailScreen -->
+    <string name="tone_stat_models">模型</string>
+    <string name="tone_stat_downloads">下载</string>
+    <string name="tone_stat_favorites">收藏</string>
+    <string name="tone_about">简介</string>
+    <string name="tone_available_models">可用模型</string>
+    <string name="tone_login_to_tone3000">登录 TONE3000</string>
+
+    <!-- 音频设置 AudioSettingsScreen -->
+    <string name="settings_title">音频设置</string>
+    <string name="settings_input_device">输入设备</string>
+    <string name="settings_output_device">输出设备</string>
+    <string name="settings_buffer_size">缓冲大小</string>
+    <string name="settings_buffer_hint">较小的缓冲区可降低延迟，但会增加 CPU 占用。除非遇到问题，建议使用自动。</string>
+    <string name="settings_default_device">默认</string>
+    <string name="settings_current_session">当前会话</string>
+    <string name="settings_sample_rate">采样率</string>
+    <string name="settings_burst_size">突发大小</string>
+    <string name="settings_audio_format">音频格式</string>
+    <string name="settings_32bit_float">32 位浮点</string>
+    <string name="settings_low_latency_checklist">低延迟检查清单</string>
+    <string name="settings_checklist_ref">基于 Android 官方 Oboe 低延迟音频指南</string>
+    <string name="settings_oboe_api">Oboe API</string>
+    <string name="settings_aaudio_backend">AAudio 后端</string>
+    <string name="settings_perf_low_latency">性能：低延迟</string>
+    <string name="settings_sharing_exclusive_output">共享模式：独占（输出）</string>
+    <string name="settings_sharing_exclusive_input">共享模式：独占（输入）</string>
+    <string name="settings_sample_rate_48000">采样率：48000 Hz</string>
+    <string name="settings_data_callback">数据回调</string>
+    <string name="settings_mmap_buffer">MMAP 缓冲</string>
+    <string name="settings_language">语言</string>
+
+    <!-- 启动/插件解压 PluginExtractScreen -->
+    <string name="extract_preparing">正在准备插件（%1$d / %2$d）</string>
+    <string name="extract_initializing">正在初始化…</string>
+
+    <!-- modgui ModguiScreen -->
+    <string name="modgui_not_found">未找到插件</string>
+    <string name="modgui_no_ui">该插件没有 modgui 界面</string>
+
+    <!-- 模型选择器 Model picker -->
+    <string name="model_picker_no_model">未加载模型</string>
+    <string name="model_picker_no_ir">未加载脉冲响应</string>
+    <string name="model_picker_title_model">选择模型</string>
+    <string name="model_picker_title_aida_x">选择 AIDA-X 模型</string>
+    <string name="model_picker_title_ir">选择脉冲响应</string>
+    <string name="model_picker_title_neural">选择神经模型</string>
+    <string name="model_picker_title_file">选择文件</string>
+</resources>

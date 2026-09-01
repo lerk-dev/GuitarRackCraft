@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "presetName": "Cory Wong - Funk",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 6.0 },
+        { "index": 1, "value": 8.0 },
+        { "index": 2, "value": -35.0 },
+        { "index": 3, "value": 0.6 },
+        { "index": 4, "value": 0.001 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_Fender_TwinVerb_Norm_Bright.nam"
+        }
+      ]
+    }
+  ]
+}

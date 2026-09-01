@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "presetName": "Stairway to Heaven (Led Zeppelin)",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_phaser#_phaser",
+    "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_Fender_TwinVerb_Norm_Bright.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_phaser#_phaser",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 45.0 },
+        { "index": 1, "value": -3.0 },
+        { "index": 2, "value": 0.4 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 28.0 },
+        { "index": 2, "value": 0.55 },
+        { "index": 3, "value": 0.5 },
+        { "index": 4, "value": 0.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

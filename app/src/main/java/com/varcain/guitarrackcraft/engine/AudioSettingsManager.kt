@@ -22,6 +22,7 @@ package com.varcain.guitarrackcraft.engine
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import com.varcain.guitarrackcraft.R
 
 data class AudioDeviceOption(
     val id: Int,
@@ -74,11 +75,9 @@ object AudioSettingsManager {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val devices = am.getDevices(AudioManager.GET_DEVICES_INPUTS)
         return buildList {
-            add(AudioDeviceOption(0, "Default", 0))
+            add(AudioDeviceOption(0, context.getString(R.string.settings_default_device), 0))
             devices.forEach { dev ->
-                val name = dev.productName?.toString()?.ifEmpty { null }
-                    ?: deviceTypeName(dev.type)
-                add(AudioDeviceOption(dev.id, "$name (${deviceTypeName(dev.type)})", dev.type))
+                add(AudioDeviceOption(dev.id, deviceDisplayName(context, dev), dev.type))
             }
         }
     }
@@ -87,30 +86,53 @@ object AudioSettingsManager {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         return buildList {
-            add(AudioDeviceOption(0, "Default", 0))
+            add(AudioDeviceOption(0, context.getString(R.string.settings_default_device), 0))
             devices.forEach { dev ->
-                val name = dev.productName?.toString()?.ifEmpty { null }
-                    ?: deviceTypeName(dev.type)
-                add(AudioDeviceOption(dev.id, "$name (${deviceTypeName(dev.type)})", dev.type))
+                add(AudioDeviceOption(dev.id, deviceDisplayName(context, dev), dev.type))
             }
         }
     }
 
-    private fun deviceTypeName(type: Int): String = when (type) {
-        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Built-in Mic"
-        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in Speaker"
-        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "Earpiece"
-        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired Headset"
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired Headphones"
-        AudioDeviceInfo.TYPE_USB_DEVICE -> "USB Device"
-        AudioDeviceInfo.TYPE_USB_ACCESSORY -> "USB Accessory"
-        AudioDeviceInfo.TYPE_USB_HEADSET -> "USB Headset"
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth SCO"
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth A2DP"
-        AudioDeviceInfo.TYPE_TELEPHONY -> "Telephony"
-        AudioDeviceInfo.TYPE_AUX_LINE -> "Aux Line"
-        AudioDeviceInfo.TYPE_HDMI -> "HDMI"
-        AudioDeviceInfo.TYPE_HDMI_ARC -> "HDMI ARC"
-        else -> "Audio Device"
+    /**
+     * Build a friendly display name for an audio device.
+     * Built-in devices (mic/speaker/earpiece) often report a serial number or
+     * board codename as productName — show the phone model (Build.MODEL) instead.
+     * External devices (USB/Bluetooth) keep their real product name.
+     */
+    private fun deviceDisplayName(context: Context, dev: AudioDeviceInfo): String {
+        val typeName = deviceTypeName(context, dev.type)
+        val isBuiltIn = when (dev.type) {
+            AudioDeviceInfo.TYPE_BUILTIN_MIC,
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+            AudioDeviceInfo.TYPE_TELEPHONY -> true
+            else -> false
+        }
+        val name = if (isBuiltIn) {
+            android.os.Build.MODEL?.takeIf { it.isNotBlank() }
+                ?: android.os.Build.DEVICE?.takeIf { it.isNotBlank() }
+                ?: "Android"
+        } else {
+            dev.productName?.toString()?.ifEmpty { null } ?: typeName
+        }
+        return "$name ($typeName)"
+    }
+
+    private fun deviceTypeName(context: Context, type: Int): String = when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> context.getString(R.string.device_type_builtin_mic)
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> context.getString(R.string.device_type_builtin_speaker)
+        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> context.getString(R.string.device_type_builtin_earpiece)
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> context.getString(R.string.device_type_wired_headset)
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> context.getString(R.string.device_type_wired_headphones)
+        AudioDeviceInfo.TYPE_USB_DEVICE -> context.getString(R.string.device_type_usb_device)
+        AudioDeviceInfo.TYPE_USB_ACCESSORY -> context.getString(R.string.device_type_usb_accessory)
+        AudioDeviceInfo.TYPE_USB_HEADSET -> context.getString(R.string.device_type_usb_headset)
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> context.getString(R.string.device_type_bluetooth_sco)
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> context.getString(R.string.device_type_bluetooth_a2dp)
+        AudioDeviceInfo.TYPE_TELEPHONY -> context.getString(R.string.device_type_telephony)
+        AudioDeviceInfo.TYPE_AUX_LINE -> context.getString(R.string.device_type_aux_line)
+        AudioDeviceInfo.TYPE_HDMI -> context.getString(R.string.device_type_hdmi)
+        AudioDeviceInfo.TYPE_HDMI_ARC -> context.getString(R.string.device_type_hdmi_arc)
+        else -> context.getString(R.string.device_type_audio_device)
     }
 }

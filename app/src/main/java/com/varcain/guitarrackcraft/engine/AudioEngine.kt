@@ -38,6 +38,7 @@ object AudioEngine {
     fun getOutputLevel(): Float = native.getOutputLevel()
     fun getCpuLoad(): Float = native.getCpuLoad()
     fun getXRunCount(): Int = native.getXRunCount()
+    fun getOutputSessionId(): Int = native.getOutputSessionId()
     fun isInputClipping(): Boolean = native.isInputClipping()
     fun isOutputClipping(): Boolean = native.isOutputClipping()
     fun resetClipping() = native.resetClipping()

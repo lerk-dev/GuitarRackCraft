@@ -37,8 +37,27 @@
 #include <lilv/lilv.h>
 #include <lv2/urid/urid.h>
 #include <lv2/atom/util.h>
+#endif
 
 // ---------- Global URID map (shared across all plugin instances + UIs) ------
+// 注意：URID map 不依赖 lilv，两种构建模式（HAVE_LV2=1/0）都必须定义
+// globalLv2UridMap/globalLv2UridUnmap —— LV2PluginUI.cpp 无条件 extern 引用
+// 它们与 UI 共享 URID 编号（stub 构建下该文件仍被编译）。
+
+#if !(defined(HAVE_LV2) && HAVE_LV2 == 1)
+/* stub 构建：lv2 头不可用，使用与 lv2/urid/urid.h ABI 兼容的最小类型定义 */
+typedef uint32_t LV2_URID;
+typedef void*    LV2_URID_Map_Handle;
+typedef void*    LV2_URID_Unmap_Handle;
+typedef struct {
+    LV2_URID_Map_Handle handle;
+    LV2_URID (*map)(LV2_URID_Map_Handle handle, const char* uri);
+} LV2_URID_Map;
+typedef struct {
+    LV2_URID_Unmap_Handle handle;
+    const char* (*unmap)(LV2_URID_Unmap_Handle handle, LV2_URID urid);
+} LV2_URID_Unmap;
+#endif
 
 namespace {
 
@@ -85,6 +104,7 @@ const char* uridUnmapCallback(LV2_URID_Unmap_Handle handle, LV2_URID id) {
 LV2_URID_Map globalLv2UridMap = { &getGlobalUridMap(), uridMapCallback };
 LV2_URID_Unmap globalLv2UridUnmap = { &getGlobalUridMap(), uridUnmapCallback };
 
+#if defined(HAVE_LV2) && HAVE_LV2 == 1
 namespace {
 LV2_Feature uridMapFeature = { LV2_URID__map, &globalLv2UridMap };
 LV2_Feature uridUnmapFeature = { LV2_URID__unmap, &globalLv2UridUnmap };
@@ -1217,6 +1237,25 @@ void LV2Plugin::connectPorts() {
 
 void LV2Plugin::initializePorts() {
     // Stub
+}
+
+void LV2Plugin::injectAtom(const void* /*data*/, uint32_t /*size*/) {
+    // Stub — atom 注入仅在有 lilv 的完整构建中实现
+}
+
+std::vector<OutputAtomEvent> LV2Plugin::drainOutputAtoms() {
+    // Stub
+    return {};
+}
+
+PluginState LV2Plugin::saveState() {
+    // Stub
+    return {};
+}
+
+bool LV2Plugin::restoreState(const PluginState& /*state*/) {
+    // Stub
+    return true;
 }
 
 #endif // HAVE_LV2 == 1

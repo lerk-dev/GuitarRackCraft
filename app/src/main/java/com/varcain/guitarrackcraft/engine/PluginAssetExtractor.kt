@@ -96,9 +96,10 @@ object PluginAssetExtractor {
         pluginDir.mkdirs()
 
         val currentVersion = try {
-            context.packageManager
-                .getPackageInfo(context.packageName, 0)
-                .longVersionCode
+            val pi = context.packageManager.getPackageInfo(context.packageName, 0)
+            // longVersionCode 是 API 28+；minSdk=26 设备上直接调用会 NoSuchMethodError
+            if (android.os.Build.VERSION.SDK_INT >= 28) pi.longVersionCode
+            else @Suppress("DEPRECATION") pi.versionCode.toLong()
         } catch (_: Exception) {
             0L
         }

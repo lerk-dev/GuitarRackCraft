@@ -486,6 +486,14 @@ Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetXRunCount(JNIEnv* 
     return g_ctx->audioEngine->getXRunCount();
 }
 
+JNIEXPORT jint JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetOutputSessionId(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) {
+        return 0;
+    }
+    return g_ctx->audioEngine->getOutputSessionId();
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeIsInputClipping(JNIEnv* env, jobject thiz) {
     if (!g_ctx->audioEngine) {

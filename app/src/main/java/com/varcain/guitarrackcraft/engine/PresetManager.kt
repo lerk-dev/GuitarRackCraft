@@ -25,6 +25,7 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Manages preset save/load using JSON files stored in filesDir/presets/.
@@ -35,6 +36,96 @@ class PresetManager(private val engine: NativeEngine) {
     companion object {
         private const val TAG = "PresetManager"
         private const val PRESETS_DIR = "presets"
+        private const val ASSET_PRESETS_DIR = "presets"
+        private const val NEURAL_MODELS_DIR = "neural_models"
+        private const val PREFS_NAME = "preset_manager"
+        private const val KEY_BUNDLED_COPIED = "bundled_presets_copied"
+        private const val KEY_NEURAL_MODELS_COPIED = "neural_models_copied"
+        // 内置预设内容版本：每次改动 assets/presets/ 中的预设时递增，
+        // 版本变化时强制用新版内置预设覆盖设备上的旧版内置预设。
+        private const val BUNDLED_PRESETS_VERSION = 2
+        private const val KEY_BUNDLED_VERSION = "bundled_presets_version"
+
+        /**
+         * 首次启动时把 assets/presets/ 下内置的名曲预设复制到 presets 目录。
+         * 默认只复制一次且不覆盖用户已有的同名文件；但内置预设版本号变化时，
+         * 会强制用 assets 中的新版预设覆盖旧版（用于将 gx_amp 音色链升级为 NAM 音色链等）。
+         */
+        fun importBundledPresets(context: Context) {
+            try {
+                val targetDir = File(context.filesDir, PRESETS_DIR)
+                targetDir.mkdirs()
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val copied = prefs.getStringSet(KEY_BUNDLED_COPIED, emptySet())!!.toMutableSet()
+                val prevVersion = prefs.getInt(KEY_BUNDLED_VERSION, 0)
+                val forceRefresh = prevVersion != BUNDLED_PRESETS_VERSION
+
+                val names = context.assets.list(ASSET_PRESETS_DIR)?.toList() ?: return
+                for (name in names) {
+                    if (!name.endsWith(".json")) continue
+                    val target = File(targetDir, name)
+                    if (forceRefresh) {
+                        // 版本升级：覆盖旧版内置预设
+                        context.assets.open("$ASSET_PRESETS_DIR/$name").use { input ->
+                            FileOutputStream(target).use { output -> input.copyTo(output) }
+                        }
+                        copied.add(name)
+                        continue
+                    }
+                    if (name in copied) continue
+                    if (target.exists()) {
+                        // 用户已有同名文件（可能自己改过），不覆盖
+                        copied.add(name)
+                        continue
+                    }
+                    context.assets.open("$ASSET_PRESETS_DIR/$name").use { input ->
+                        FileOutputStream(target).use { output -> input.copyTo(output) }
+                    }
+                    copied.add(name)
+                }
+                if (forceRefresh) {
+                    prefs.edit().putInt(KEY_BUNDLED_VERSION, BUNDLED_PRESETS_VERSION).apply()
+                    Log.i(TAG, "importBundledPresets: bundled presets version upgraded to $BUNDLED_PRESETS_VERSION")
+                }
+                prefs.edit().putStringSet(KEY_BUNDLED_COPIED, copied).apply()
+                Log.i(TAG, "importBundledPresets: imported bundled presets into ${targetDir.absolutePath}")
+            } catch (e: Exception) {
+                Log.e(TAG, "importBundledPresets failed: ${e.message}", e)
+            }
+        }
+
+        /**
+         * 首次启动时把 assets/neural_models/ 下内置的 NAM 模型复制到
+         * filesDir/neural_models/（预设中的 NAM 插件从这里加载模型）。
+         * 只复制一次且不覆盖用户自行下载的同名模型。
+         */
+        fun importBundledNeuralModels(context: Context) {
+            try {
+                val targetDir = File(context.filesDir, NEURAL_MODELS_DIR)
+                targetDir.mkdirs()
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val copied = prefs.getStringSet(KEY_NEURAL_MODELS_COPIED, emptySet())!!.toMutableSet()
+
+                val names = context.assets.list(NEURAL_MODELS_DIR)?.toList() ?: return
+                for (name in names) {
+                    if (name in copied) continue
+                    val target = File(targetDir, name)
+                    if (target.exists()) {
+                        // 已有同名文件（可能是用户自己下载的），不覆盖
+                        copied.add(name)
+                        continue
+                    }
+                    context.assets.open("$NEURAL_MODELS_DIR/$name").use { input ->
+                        FileOutputStream(target).use { output -> input.copyTo(output) }
+                    }
+                    copied.add(name)
+                }
+                prefs.edit().putStringSet(KEY_NEURAL_MODELS_COPIED, copied).apply()
+                Log.i(TAG, "importBundledNeuralModels: imported bundled models into ${targetDir.absolutePath}")
+            } catch (e: Exception) {
+                Log.e(TAG, "importBundledNeuralModels failed: ${e.message}", e)
+            }
+        }
     }
 
     private fun presetsDir(context: Context): File {

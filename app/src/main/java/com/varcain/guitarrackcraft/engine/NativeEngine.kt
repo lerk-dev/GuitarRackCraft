@@ -179,6 +179,11 @@ class NativeEngine private constructor() {
     external fun nativeGetXRunCount(): Int
 
     /**
+     * Audio session id of the output stream (0 if none).
+     */
+    external fun nativeGetOutputSessionId(): Int
+
+    /**
      * True if input has clipped.
      */
     external fun nativeIsInputClipping(): Boolean
@@ -464,6 +469,7 @@ class NativeEngine private constructor() {
     fun getOutputLevel(): Float = nativeGetOutputLevel()
     fun getCpuLoad(): Float = nativeGetCpuLoad()
     fun getXRunCount(): Int = nativeGetXRunCount()
+    fun getOutputSessionId(): Int = nativeGetOutputSessionId()
     fun isInputClipping(): Boolean = nativeIsInputClipping()
     fun isOutputClipping(): Boolean = nativeIsOutputClipping()
     fun resetClipping() = nativeResetClipping()

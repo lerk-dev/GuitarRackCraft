@@ -34,6 +34,7 @@
 
 #define LOG_TAG "AudioEngine"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 namespace guitarrackcraft {
@@ -82,7 +83,7 @@ bool AudioEngine::start(float sampleRate, int32_t inputDeviceId,
     return true;
 }
 
-void AudioEngine::stop() {
+oboe::Result AudioEngine::stop() {
     LOGI("stop() entered tid=%ld isRunning_=%d", getTid(), isRunning_ ? 1 : 0);
     if (!isRunning_) {
         // Stream may have been closed by onErrorAfterClose (e.g. system closed stream when opening X11 UI).
@@ -91,7 +92,7 @@ void AudioEngine::stop() {
         // AudioTrack callback thread is still in getStream() -> pthread_mutex_lock on destroyed mutex (SIGABRT).
         LOGI("stop() isRunning_=0; calling closeStreams() anyway so streams tear down safely");
         closeStreams();
-        return;
+        return oboe::Result::OK;
     }
     // Stop recording before tearing down the audio path
     if (recorder_.isRecording()) {
@@ -108,6 +109,7 @@ void AudioEngine::stop() {
 
     closeStreams();
     LOGI("stop() done");
+    return oboe::Result::OK;
 }
 
 bool AudioEngine::isRunning() const {
@@ -132,16 +134,29 @@ AudioEngine::StreamInfo AudioEngine::getStreamInfo() const {
 }
 
 double AudioEngine::getLatencyMs() const {
-    if (!outputStream_) {
-        return 0.0;
+    double latencyMs = 0.0;
+
+    // Output stream: buffer size + frames written-but-not-yet-played
+    if (outputStream_) {
+        int64_t framesWritten = outputStream_->getFramesWritten();
+        int64_t framesRead = outputStream_->getFramesRead();
+        int32_t bufferSize = outputStream_->getBufferSizeInFrames();
+
+        double latencyFrames = bufferSize + (framesWritten - framesRead);
+        latencyMs += (latencyFrames / sampleRate_) * 1000.0;
     }
-    
-    int64_t framesWritten = outputStream_->getFramesWritten();
-    int64_t framesRead = outputStream_->getFramesRead();
-    int32_t bufferSize = outputStream_->getBufferSizeInFrames();
-    
-    double latencyFrames = bufferSize + (framesWritten - framesRead);
-    return (latencyFrames / sampleRate_) * 1000.0;
+
+    // Input stream: the input buffer is the dominant latency source on devices
+    // where the audio policy limits the capture buffer (e.g. 4096 frames ≈ 85ms
+    // at 48kHz). Ignoring it makes the reported latency wildly optimistic.
+    if (inputStream_) {
+        int32_t inBufferSize = inputStream_->getBufferSizeInFrames();
+        if (inBufferSize > 0) {
+            latencyMs += (inBufferSize / sampleRate_) * 1000.0;
+        }
+    }
+
+    return latencyMs;
 }
 
 float AudioEngine::getInputLevel() const {
@@ -173,6 +188,15 @@ int32_t AudioEngine::getXRunCount() const {
      * thread sees full buffers, just silent) — so Oboe never knows. Add
      * the per-plugin underrun counter so the UI's "xruns" reflects both. */
     return oboeXruns + vstUnderruns_.load();
+}
+
+int32_t AudioEngine::getOutputSessionId() const {
+    if (!outputStream_) {
+        return 0;
+    }
+    int32_t sessionId = outputStream_->getSessionId();
+    // Oboe returns kNoSessionId (-1) when the stream has no session.
+    return sessionId < 0 ? 0 : sessionId;
 }
 
 bool AudioEngine::isInputClipping() const {
@@ -296,34 +320,23 @@ void AudioEngine::resampleToEngineRate(const std::vector<float>& src,
     }
 }
 
-oboe::DataCallbackResult AudioEngine::onAudioReady(
-    oboe::AudioStream* audioStream,
-    void* audioData,
-    int32_t numFrames) {
-    // Debug: log callback thread still active (rate-limited) to correlate with closeStreams() tid
-    {
-        static std::atomic<int> enterCount{0};
-        static auto lastEnterLog = std::chrono::steady_clock::now();
-        int c = enterCount++;
-        auto now = std::chrono::steady_clock::now();
-        if (c < 3 || std::chrono::duration<double>(now - lastEnterLog).count() >= 5.0) {
-            if (c >= 3) lastEnterLog = now;
-            LOGI("onAudioReady ENTER tid=%ld (callback thread, count=%d)", getTid(), c);
-        }
-    }
-    // Debug: log when callback bails due to shutdown (rate-limited)
+oboe::DataCallbackResult AudioEngine::onBothStreamsReady(
+    const void* inputData,
+    int   numInputFrames,
+    void* outputData,
+    int   numOutputFrames) {
+    const int32_t numFrames = numOutputFrames;
     if (!isRunning_ || numFrames <= 0) {
-        static std::atomic<int> bailCount{0};
-        int c = bailCount++;
-        if (c < 5 || (c % 50 == 0)) {
-            LOGI("onAudioReady: bail tid=%ld !isRunning_=%d numFrames=%d (bail #%d)",
-                 getTid(), isRunning_ ? 0 : 1, numFrames, c);
-        }
         return oboe::DataCallbackResult::Continue;
     }
-    // Only process when the output stream needs data (we do not set callback on input).
-    if (audioStream != outputStream_.get()) {
-        return oboe::DataCallbackResult::Continue;
+
+    // Ensure buffers are large enough before touching them
+    if (inputBuffer_.size() < static_cast<size_t>(numFrames)) {
+        inputBuffer_.resize(numFrames);
+    }
+    if (outputBufferLeft_.size() < static_cast<size_t>(numFrames)) {
+        outputBufferLeft_.resize(numFrames);
+        outputBufferRight_.resize(numFrames);
     }
 
     // Input source: WAV playback or microphone
@@ -341,15 +354,16 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
             wavPlaying_.store(false);
         }
     } else {
-        int32_t framesRead = 0;
-        if (inputStream_) {
-            auto result = inputStream_->read(inputBuffer_.data(), numFrames, 0);
-            if (result == oboe::Result::OK) {
-                framesRead = result.value();
-            }
+        // FullDuplexStream only calls this once input data is available, but the
+        // number of frames delivered (numInputFrames) can be smaller than the
+        // output block size (e.g. right after start). Copy what we got and
+        // silence the remainder so a partial block never repeats stale audio.
+        int32_t framesToCopy = std::min(numInputFrames, numFrames);
+        if (framesToCopy > 0) {
+            std::memcpy(inputBuffer_.data(), inputData, framesToCopy * sizeof(float));
         }
-        if (framesRead < numFrames) {
-            std::memset(inputBuffer_.data() + framesRead, 0, (numFrames - framesRead) * sizeof(float));
+        if (framesToCopy < numFrames) {
+            std::memset(inputBuffer_.data() + framesToCopy, 0, (numFrames - framesToCopy) * sizeof(float));
         }
     }
 
@@ -371,18 +385,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration<double>(now - lastLog).count() >= 1.0) {
             lastLog = now;
-            LOGI("onAudioReady: source=%s numFrames=%d inputPeak=%.4f",
+            LOGI("onBothStreamsReady: source=%s numFrames=%d inputPeak=%.4f",
                  useWav ? "WAV" : "mic", numFrames, inputPeak);
         }
-    }
-
-    // Ensure buffers are large enough
-    if (inputBuffer_.size() < static_cast<size_t>(numFrames)) {
-        inputBuffer_.resize(numFrames);
-    }
-    if (outputBufferLeft_.size() < static_cast<size_t>(numFrames)) {
-        outputBufferLeft_.resize(numFrames);
-        outputBufferRight_.resize(numFrames);
     }
 
     // Set up input pointers (mono guitar input -> stereo)
@@ -390,8 +395,8 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     inputPtrs_[1] = inputBuffer_.data();  // Duplicate mono to stereo
 
     // Set up output pointers (always process into our buffers for metering)
-    float* outputData = static_cast<float*>(audioData);
-    int32_t numChannels = audioStream->getChannelCount();
+    float* outData = static_cast<float*>(outputData);
+    int32_t numChannels = outputStream_ ? outputStream_->getChannelCount() : 2;
     outputPtrs_[0] = outputBufferLeft_.data();
     outputPtrs_[1] = outputBufferRight_.data();
 
@@ -508,19 +513,19 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration<double>(now - lastLogOut).count() >= 1.0) {
             lastLogOut = now;
-            LOGI("onAudioReady: outputPeak=%.4f", outputPeak);
+            LOGI("onBothStreamsReady: outputPeak=%.4f", outputPeak);
         }
     }
 
     // Copy to output (stereo: deinterleave; mono: mix)
     if (numChannels == 2) {
         for (int32_t i = 0; i < numFrames; ++i) {
-            outputData[i * 2] = outputBufferLeft_[i];
-            outputData[i * 2 + 1] = outputBufferRight_[i];
+            outData[i * 2] = outputBufferLeft_[i];
+            outData[i * 2 + 1] = outputBufferRight_[i];
         }
     } else {
         for (int32_t i = 0; i < numFrames; ++i) {
-            outputData[i] = (outputBufferLeft_[i] + outputBufferRight_[i]) * 0.5f;
+            outData[i] = (outputBufferLeft_[i] + outputBufferRight_[i]) * 0.5f;
         }
     }
 
@@ -556,31 +561,66 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
     // --- Input stream (mono, for guitar) ---
     // Force AAudio API — OpenSL ES cannot do exclusive or MMAP.
     // Oboe's QuirksManager may silently choose OpenSL ES otherwise.
-    // Use a dedicated builder to avoid leaking input-only settings to output.
     // Do NOT set a callback on input — only the output stream drives the callback.
-    // We read from the input inside the output stream's onAudioReady.
-    oboe::AudioStreamBuilder inputBuilder;
-    inputBuilder.setDirection(oboe::Direction::Input)
-           ->setAudioApi(oboe::AudioApi::AAudio)
-           ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-           ->setSharingMode(oboe::SharingMode::Exclusive)
-           ->setFormat(oboe::AudioFormat::Float)
-           ->setChannelCount(1)
-           ->setSampleRate(static_cast<int32_t>(sampleRate))
-           ->setInputPreset(oboe::InputPreset::VoiceRecognition);
+    // The input is read inside the output callback, synchronized via FullDuplexStream.
 
-    if (inputDeviceId_ != 0) {
-        inputBuilder.setDeviceId(inputDeviceId_);
-        LOGI("Input device ID set to %d", inputDeviceId_);
-    }
-
+    // 打开输入流：优先"现场演奏"预置（无 AGC/NS 语音处理，延迟最低、不破坏吉他信号）。
+    // VoicePerformance 需要 API 30+，老设备回退 Generic。注意不要用 VoiceRecognition：
+    // 它会开启自动增益/降噪等语音处理，既增加延迟也会改变吉他音色。
+    // 采样率回退：请求的采样率（默认 48000）不被设备支持时（USB 声卡如 Apogee Jam 96k
+    // 只支持 44.1/96kHz），依次尝试 44100/48000，最后回退系统默认设备。
+    // 每次新建 builder，避免依赖已设置过的 deviceId 状态。
     oboe::AudioStream* inputStreamPtr = nullptr;
-    oboe::Result result = inputBuilder.openStream(&inputStreamPtr);
+    auto openInput = [&](int32_t deviceId, oboe::AudioApi api, int32_t rate,
+                         oboe::InputPreset preset) -> oboe::Result {
+        oboe::AudioStreamBuilder b;
+        b.setDirection(oboe::Direction::Input)
+         ->setAudioApi(api)
+         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+         ->setSharingMode(oboe::SharingMode::Exclusive)
+         ->setFormat(oboe::AudioFormat::Float)
+         ->setChannelCount(1)
+         ->setSampleRate(rate)
+         ->setInputPreset(preset);
+        if (deviceId != 0) {
+            b.setDeviceId(deviceId);
+            LOGI("Input device ID set to %d", deviceId);
+        }
+        return b.openStream(&inputStreamPtr);
+    };
+
+    const int32_t requestedRate = static_cast<int32_t>(sampleRate);
+    oboe::Result result = openInput(inputDeviceId_, oboe::AudioApi::AAudio,
+                                    requestedRate, oboe::InputPreset::VoicePerformance);
     if (result != oboe::Result::OK) {
-        // AAudio failed — retry without forcing API (let Oboe pick)
-        LOGE("AAudio input open failed (%s), retrying with default API", oboe::convertToText(result));
-        inputBuilder.setAudioApi(oboe::AudioApi::Unspecified);
-        result = inputBuilder.openStream(&inputStreamPtr);
+        // VoicePerformance 需要 API 30+；老设备用 Generic（同样无语音处理）
+        LOGI("Input open with VoicePerformance failed (%s), retrying with Generic preset",
+             oboe::convertToText(result));
+        result = openInput(inputDeviceId_, oboe::AudioApi::AAudio,
+                           requestedRate, oboe::InputPreset::Generic);
+    }
+    // USB 声卡可能不支持 48kHz（如 Apogee Jam 96k 只支持 44.1/96kHz）→ 试 44.1k
+    if (result != oboe::Result::OK && requestedRate != 44100) {
+        LOGW("Input open at %d Hz failed (%s); retrying at 44100 Hz",
+             requestedRate, oboe::convertToText(result));
+        result = openInput(inputDeviceId_, oboe::AudioApi::Unspecified,
+                           44100, oboe::InputPreset::Generic);
+    }
+    // 再试 48k（可能上一步 44.1k 反而不支持）
+    if (result != oboe::Result::OK && requestedRate != 48000) {
+        LOGW("Input open at 44100 Hz failed (%s); retrying at 48000 Hz",
+             oboe::convertToText(result));
+        result = openInput(inputDeviceId_, oboe::AudioApi::Unspecified,
+                           48000, oboe::InputPreset::Generic);
+    }
+    if (result != oboe::Result::OK) {
+        // 用户保存的设备可能已不可用（如 USB 声卡被拔出/耳机麦克风移除），
+        // 回退到系统默认输入设备，避免引擎因此完全无法启动。
+        LOGW("Input open with device %d failed (%s); retrying with default device",
+             inputDeviceId_, oboe::convertToText(result));
+        inputDeviceId_ = 0;
+        result = openInput(0, oboe::AudioApi::Unspecified, requestedRate,
+                           oboe::InputPreset::Generic);
         if (result != oboe::Result::OK) {
             LOGE("Failed to open input stream: %s", oboe::convertToText(result));
             return false;
@@ -588,11 +628,13 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
     }
     inputStream_.reset(inputStreamPtr);
 
-    LOGI("Input stream opened: api=%d sharing=%d perf=%d mmap=%d",
+    LOGI("Input stream opened: rate=%d api=%d sharing=%d perf=%d mmap=%d preset=%d",
+         inputStream_->getSampleRate(),
          static_cast<int>(inputStream_->getAudioApi()),
          static_cast<int>(inputStream_->getSharingMode()),
          static_cast<int>(inputStream_->getPerformanceMode()),
-         oboe::OboeExtensions::isMMapUsed(inputStream_.get()));
+         oboe::OboeExtensions::isMMapUsed(inputStream_.get()),
+         static_cast<int>(inputStream_->getInputPreset()));
 
     // Use actual sample rate from stream
     sampleRate_ = static_cast<float>(inputStream_->getSampleRate());
@@ -606,8 +648,16 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
            ->setFormat(oboe::AudioFormat::Float)
            ->setChannelCount(2)
            ->setSampleRate(static_cast<int32_t>(sampleRate_))
+           // Note: "VoicePerformance" exists only as an INPUT preset in AAudio
+           // (already used for the input stream above); there is no such output
+           // usage. Game is the correct low-latency output usage.
            ->setUsage(oboe::Usage::Game)
-           ->setCallback(this);
+           // Allocate an audio session so the Kotlin layer can disable OEM
+           // post-processing effects (Dolby/MiSound) that get inserted on it
+           // and audibly distort a live guitar signal.
+           ->setSessionId(oboe::SessionId::Allocate)
+           ->setDataCallback(this)
+           ->setErrorCallback(this);
 
     if (outputDeviceId_ != 0) {
         outputBuilder.setDeviceId(outputDeviceId_);
@@ -636,7 +686,12 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
 
     // Determine callback block size.
     // If the user requested a specific buffer size, use it directly.
-    // Otherwise, ensure power-of-2 for convolver plugin compatibility.
+    // Otherwise use the hardware burst size as the callback block: processing
+    // at the burst size lets the stream buffers be shrunk down to the burst
+    // (lowest latency). LV2 convolver plugins already round the block size up
+    // to a power of 2 internally (LV2Plugin::activate), so we don't need a
+    // power-of-2 framesPerCallback here — forcing one only inflates the
+    // minimum buffer and adds latency.
     {
         if (requestedBufferFrames_ > 0) {
             callbackFrameCount_ = static_cast<uint32_t>(requestedBufferFrames_);
@@ -655,49 +710,114 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
             }
         } else {
             int32_t framesPerBurst = outputStreamPtr->getFramesPerBurst();
-            uint32_t po2 = 1;
-            while (po2 < static_cast<uint32_t>(framesPerBurst)) po2 <<= 1;
-            callbackFrameCount_ = po2;
-
-            bool isPo2 = (framesPerBurst > 0) &&
-                          ((framesPerBurst & (framesPerBurst - 1)) == 0);
-            if (!isPo2) {
-                LOGI("framesPerBurst=%d not power-of-2, reopening with framesPerCallback=%u",
-                     framesPerBurst, po2);
-                outputStreamPtr->close();
-                delete outputStreamPtr;
-                outputStreamPtr = nullptr;
-
-                outputBuilder.setFramesPerCallback(static_cast<int32_t>(po2));
-                result = outputBuilder.openStream(&outputStreamPtr);
-                if (result != oboe::Result::OK) {
-                    LOGE("Failed to reopen output stream with po2 callback: %s",
-                         oboe::convertToText(result));
-                    closeStreams();
-                    return false;
-                }
-            } else {
-                LOGI("framesPerBurst=%d already power-of-2", framesPerBurst);
-            }
+            callbackFrameCount_ = (framesPerBurst > 0)
+                                      ? static_cast<uint32_t>(framesPerBurst)
+                                      : 128u;
+            LOGI("Using native burst as callback block size: %u frames",
+                 callbackFrameCount_);
         }
     }
 
     outputStream_.reset(outputStreamPtr);
 
-    // Start streams
-    result = inputStream_->requestStart();
+    // Full-duplex 同步：把输入/输出流交给 FullDuplexStream 对齐。启动时会先排空
+    // 输入缓冲并维持输入/输出均衡，回调内只在实际有数据时才读取，避免读到陈旧
+    // 数据（USB 声卡场景下陈旧数据会累积成几十~上百毫秒的恒定延迟）。
+    setInputStream(inputStream_.get());
+    setOutputStream(outputStream_.get());
+
+    // 最小化应用侧缓冲以降低延迟（USB 声卡/外置接口影响最大）：
+    // Oboe 打开流时默认分配的缓冲通常是硬件 burst 的 2-4 倍，音频会因此在
+    // 应用的输入/输出队列里多停留若干毫秒。显式收缩到设备允许的最小值，
+    // 下限为 max(burst, 回调块大小)，保证每次回调都能读满/写满一块。
+    // 注意：不要用 setFramesPerCallback 强制大于 burst 的回调块，那会把最小
+    // 缓冲顶到回调块大小，反而增加延迟（见上面的 callbackFrameCount_ 逻辑）。
+    {
+        int32_t outBurst = outputStream_->getFramesPerBurst();
+        int32_t minOut = std::max(outBurst, static_cast<int32_t>(callbackFrameCount_));
+        if (minOut > 0) {
+            auto shrink = outputStream_->setBufferSizeInFrames(minOut);
+            if (shrink == oboe::Result::OK) {
+                LOGI("Output buffer shrunk to %d frames (burst=%d, callback=%u)",
+                     shrink.value(), outBurst, callbackFrameCount_);
+            } else {
+                LOGW("Failed to shrink output buffer to %d: %s",
+                     minOut, oboe::convertToText(shrink.error()));
+            }
+        }
+
+        if (inputStream_) {
+            int32_t inBurst = inputStream_->getFramesPerBurst();
+            int32_t minIn = std::max(inBurst, static_cast<int32_t>(callbackFrameCount_));
+            if (minIn > 0) {
+                auto shrinkIn = inputStream_->setBufferSizeInFrames(minIn);
+                if (shrinkIn == oboe::Result::OK) {
+                    LOGI("Input buffer shrunk to %d frames (burst=%d, callback=%u)",
+                         shrinkIn.value(), inBurst, callbackFrameCount_);
+                } else {
+                    LOGW("Failed to shrink input buffer to %d: %s",
+                         minIn, oboe::convertToText(shrinkIn.error()));
+                }
+            }
+        }
+    }
+
+    // Start both streams in sync (input first, then output). 显式限定基类作用域：
+    // 本类自己的 start(float,...) 有全默认参数，直接调用会递归。
+    result = oboe::FullDuplexStream::start();
     if (result != oboe::Result::OK) {
-        LOGE("Failed to start input stream: %s", oboe::convertToText(result));
+        LOGE("Failed to start duplex streams: %s", oboe::convertToText(result));
         closeStreams();
         return false;
     }
 
-    result = outputStream_->requestStart();
-    if (result != oboe::Result::OK) {
-        LOGE("Failed to start output stream: %s", oboe::convertToText(result));
-        closeStreams();
-        return false;
+    // 输入/输出采样率一致性检查：若两者不同，框架会静默重采样，既增加延迟
+    // 又可能破坏音色。正常情况（USB 声卡 44.1/48k 都能协商）应一致。
+    {
+        int32_t inRate = inputStream_->getSampleRate();
+        int32_t outRate = outputStream_->getSampleRate();
+        if (inRate != outRate) {
+            LOGW("SAMPLE RATE MISMATCH: input=%d Hz vs output=%d Hz -> framework "
+                 "resampling adds latency. Consider forcing both to the same rate.",
+                 inRate, outRate);
+        }
     }
+
+    // 流启动后再收缩一次：部分设备（尤其 USB 声卡）只有在流运行起来后才真正
+    // 应用 setBufferSizeInFrames。二次请求 burst 大小的缓冲，把应用侧停留时间
+    // 压到最低。
+    {
+        int32_t outBurst = outputStream_->getFramesPerBurst();
+        if (outBurst > 0 && outputStream_->getBufferSizeInFrames() > outBurst) {
+            auto r = outputStream_->setBufferSizeInFrames(outBurst);
+            if (r == oboe::Result::OK) {
+                LOGI("Post-start output shrink to %d frames (burst=%d)", r.value(), outBurst);
+            } else {
+                LOGW("Post-start output shrink to %d failed: %s",
+                     outBurst, oboe::convertToText(r.error()));
+            }
+        }
+        if (inputStream_) {
+            int32_t inBurst = inputStream_->getFramesPerBurst();
+            if (inBurst > 0 && inputStream_->getBufferSizeInFrames() > inBurst) {
+                auto r = inputStream_->setBufferSizeInFrames(inBurst);
+                if (r == oboe::Result::OK) {
+                    LOGI("Post-start input shrink to %d frames (burst=%d)", r.value(), inBurst);
+                } else {
+                    LOGW("Post-start input shrink to %d failed: %s",
+                         inBurst, oboe::convertToText(r.error()));
+                }
+            }
+        }
+    }
+
+    // 后台延迟调谐器（参考 Amp Rack 的 LatencyTuner 策略）：部分设备在流刚
+    // 启动时会拒绝收缩输入缓冲，或在系统策略变化后（如切后台再回前台）才
+    // 允许更小的值。定期重试收缩，并在出现新的 xrun 时自动回退一个 burst，
+    // 在"尽量小的缓冲"和"不丢音"之间自适应。
+    latencyTunerRunning_.store(true);
+    tunerXrunsAtShrink_.store(-1);
+    latencyTunerThread_ = std::thread(&AudioEngine::latencyTunerLoop, this);
 
     // Allocate buffers
     int32_t bufferSize = outputStream_->getBufferSizeInFrames();
@@ -705,15 +825,108 @@ bool AudioEngine::createAudioStreams(float sampleRate) {
     outputBufferLeft_.resize(bufferSize);
     outputBufferRight_.resize(bufferSize);
 
-    LOGI("Audio streams created: %d Hz, buffer size: %d frames", 
+    // 详细诊断日志：用于核对 USB 声卡场景下实际协商出的采样率/缓冲/共享模式。
+    LOGI("AUDIO STREAM CFG: rate=%d callbackFrames=%u "
+         "in{api=%d sharing=%d perf=%d mmap=%d burst=%d buf=%d cap=%d} "
+         "out{api=%d sharing=%d perf=%d mmap=%d burst=%d buf=%d cap=%d}",
+         static_cast<int>(sampleRate_), callbackFrameCount_,
+         static_cast<int>(inputStream_->getAudioApi()),
+         static_cast<int>(inputStream_->getSharingMode()),
+         static_cast<int>(inputStream_->getPerformanceMode()),
+         oboe::OboeExtensions::isMMapUsed(inputStream_.get()),
+         inputStream_->getFramesPerBurst(),
+         inputStream_->getBufferSizeInFrames(),
+         inputStream_->getBufferCapacityInFrames(),
+         static_cast<int>(outputStream_->getAudioApi()),
+         static_cast<int>(outputStream_->getSharingMode()),
+         static_cast<int>(outputStream_->getPerformanceMode()),
+         oboe::OboeExtensions::isMMapUsed(outputStream_.get()),
+         outputStream_->getFramesPerBurst(),
+         outputStream_->getBufferSizeInFrames(),
+         outputStream_->getBufferCapacityInFrames());
+    LOGI("Audio streams created: %d Hz, buffer size: %d frames",
          static_cast<int>(sampleRate_), bufferSize);
 
     return true;
 }
 
+void AudioEngine::latencyTunerLoop() {
+    // Sleep helper: abortable in 250ms steps so engine teardown never waits
+    // more than a quarter second for this thread.
+    auto nap = [this](int totalMs) {
+        int slept = 0;
+        while (slept < totalMs && latencyTunerRunning_.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            slept += 250;
+        }
+    };
+
+    // Give the streams a moment to settle before the first tuning attempt.
+    nap(2000);
+
+    int attempts = 0;
+    while (latencyTunerRunning_.load() && attempts < 20) {
+        attempts++;
+        auto* in = inputStream_.get();
+        if (!in) break;
+
+        int32_t inBurst = in->getFramesPerBurst();
+        int32_t target = std::max(inBurst, static_cast<int32_t>(callbackFrameCount_));
+        int32_t current = in->getBufferSizeInFrames();
+        int32_t xruns = getXRunCount();
+
+        // Back off when the last successful shrink was followed by new xruns:
+        // the buffer went below what the capture path can reliably deliver.
+        if (tunerXrunsAtShrink_.load() >= 0 && xruns > tunerXrunsAtShrink_.load()) {
+            int32_t relaxed = current + inBurst;
+            auto r = in->setBufferSizeInFrames(relaxed);
+            LOGW("LatencyTuner: xruns after shrink (%d -> %d), relaxing input buffer to %d frames",
+                 tunerXrunsAtShrink_.load(), xruns,
+                 r == oboe::Result::OK ? r.value() : relaxed);
+            tunerXrunsAtShrink_.store(-1);
+            nap(3000);
+            continue;
+        }
+
+        if (current > target && target > 0) {
+            // Retry the shrink — some devices only allow it after the stream
+            // has been running for a while, or clamp to intermediate sizes.
+            auto r = in->setBufferSizeInFrames(target);
+            if (r == oboe::Result::OK && r.value() < current) {
+                LOGI("LatencyTuner: input buffer %d -> %d frames (target=%d)",
+                     current, r.value(), target);
+                tunerXrunsAtShrink_.store(xruns);
+                nap(2000);
+                continue;
+            }
+            if (r == oboe::Result::OK && r.value() >= current) {
+                // Accepted but clamped by the audio policy — the requested
+                // size is below the enforced minimum. Keep retrying a few
+                // times in case the policy relaxes, but log it so the
+                // limitation is visible from logcat.
+                LOGW("LatencyTuner: input shrink to %d clamped at %d frames "
+                     "(system-enforced minimum)", target, r.value());
+            }
+        } else if (current <= target) {
+            // Fully shrunk. If the last shrink stayed xrun-free across the
+            // observation window, tuning is done; otherwise the backoff
+            // branch above will have relaxed the buffer already.
+            LOGI("LatencyTuner: input buffer at target %d frames, tuning done", target);
+            break;
+        }
+        nap(1000);
+    }
+}
+
 void AudioEngine::closeStreams() {
     LOGI("closeStreams() ENTER tid=%ld (caller thread; AudioTrack callback is different tid)", getTid());
-    
+
+    // Stop the latency tuner first — it touches the streams from its own thread.
+    latencyTunerRunning_.store(false);
+    if (latencyTunerThread_.joinable()) {
+        latencyTunerThread_.join();
+    }
+
     // First, signal the callback to stop immediately to prevent new callbacks
     // from starting while we're tearing down.
     isRunning_.store(false);

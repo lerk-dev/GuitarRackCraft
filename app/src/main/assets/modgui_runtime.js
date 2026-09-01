@@ -217,6 +217,15 @@
         if (p.toggle) bypassPort = p;
     });
     document.querySelectorAll('[mod-role="bypass"]').forEach(function(el) {
+        // Plugin has no toggle port (e.g. Neural Amp Modeler): the footswitch
+        // would be a dead control — hide it and its lights instead.
+        if (!bypassPort) {
+            el.style.display = 'none';
+            document.querySelectorAll('[mod-role="bypass-light"]').forEach(function(light) {
+                light.style.display = 'none';
+            });
+            return;
+        }
         var enabled = bypassPort ? AndroidHost.getParameter(bypassPort.symbol) > 0.5 : true;
         el.style.cursor = 'pointer';
         el.style.touchAction = 'none';

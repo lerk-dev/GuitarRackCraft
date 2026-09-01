@@ -52,6 +52,10 @@ bool AudioRecorder::startRecording(const std::string& rawPath, const std::string
     rawRing_.resize(rawCapacity);
     processedRing_.resize(processedCapacity);
 
+    // 预分配立体声交织缓冲（覆盖 4096 帧回调），避免 feedAudio 在音频
+    // 回调线程上首次/扩容时堆分配。回调尺寸只增不减，之后不再触发 resize。
+    interleaveBuffer_.resize(4096 * 2);
+
     // Open files
     rawFile_.open(rawPath, std::ios::binary | std::ios::trunc);
     if (!rawFile_.is_open()) {
@@ -127,8 +131,11 @@ void AudioRecorder::feedAudio(const float* rawMono, const float* processedL, con
     if (stereoSamples <= 1024) {
         buf = stackBuf;
     } else {
-        // Very large buffer — use heap (should be rare at typical buffer sizes)
-        interleaveBuffer_.resize(stereoSamples);
+        // 超大回调（>512 帧）：用预分配的成员缓冲，仅当不足时才扩容
+        // （只增不减，稳定后音频路径零堆分配）
+        if (interleaveBuffer_.size() < stereoSamples) {
+            interleaveBuffer_.resize(stereoSamples);
+        }
         buf = interleaveBuffer_.data();
     }
 

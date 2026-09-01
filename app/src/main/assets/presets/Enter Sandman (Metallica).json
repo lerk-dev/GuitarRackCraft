@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "presetName": "Enter Sandman (Metallica)",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gxtubedelay#tubedelay",
+    "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Roman_A_LT_MESA_MARKIV_1.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gxtubedelay#tubedelay",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.3 },
+        { "index": 1, "value": 260.0 },
+        { "index": 2, "value": 0.35 },
+        { "index": 3, "value": 0.3 },
+        { "index": 4, "value": -6.0 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 18.0 },
+        { "index": 2, "value": 0.4 },
+        { "index": 3, "value": 0.6 },
+        { "index": 4, "value": 0.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

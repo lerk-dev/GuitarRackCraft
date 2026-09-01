@@ -20,6 +20,8 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    // Kotlin 2.0 起启用 compose 的模块必须显式应用 compose 编译器插件
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {

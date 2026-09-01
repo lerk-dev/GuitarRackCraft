@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "presetName": "Smells Like Teen Spirit (Nirvana)",
+  "timestamp": 1787900003000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gx_fuzz_#fuzz_",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_fuzz_#fuzz_",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": 55.0 },
+        { "index": 2, "value": 40.0 },
+        { "index": 3, "value": 0.6 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Mikhail_K_Sovtek_MIG50.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.35 },
+        { "index": 1, "value": 0.02 },
+        { "index": 2, "value": 0.45 },
+        { "index": 3, "value": 2.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

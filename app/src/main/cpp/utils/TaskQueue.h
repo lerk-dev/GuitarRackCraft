@@ -19,9 +19,11 @@
 
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <atomic>
@@ -40,14 +42,17 @@ public:
         cv_.notify_one();
     }
 
-    void postAndWait(Task task) {
-        std::promise<void> done;
-        auto future = done.get_future();
-        post([&task, &done]() {
+    // 同步执行：入队并等待完成。超时返回 false（任务可能仍会在队列
+    // 线程稍后执行——promise 用 shared_ptr 持有，超时返回不会留下悬空引用）。
+    // 防止队列线程已 stop/卡死时调用方永久阻塞。
+    bool postAndWait(Task task, std::chrono::milliseconds timeout = std::chrono::milliseconds(5000)) {
+        auto done = std::make_shared<std::promise<void>>();
+        auto future = done->get_future();
+        post([task = std::move(task), done]() {
             task();
-            done.set_value();
+            done->set_value();
         });
-        future.wait();
+        return future.wait_for(timeout) == std::future_status::ready;
     }
 
     void stop() {

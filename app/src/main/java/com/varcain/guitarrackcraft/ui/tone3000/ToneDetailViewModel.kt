@@ -20,8 +20,11 @@
 package com.varcain.guitarrackcraft.ui.tone3000
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.varcain.guitarrackcraft.R
+import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.engine.NativeEngine
 import com.varcain.guitarrackcraft.engine.RackManager
 import com.varcain.guitarrackcraft.engine.X11Bridge
@@ -35,6 +38,9 @@ import java.io.IOException
 class ToneDetailViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
     private val api = Tone3000Api(tokenManager)
+
+    /** 按当前应用语言返回包装后的上下文，用于解析本地化字符串。 */
+    private fun ctx(): Context = LanguageManager.wrapContext(getApplication())
 
     private val _tone = MutableStateFlow<Tone?>(null)
     val tone: StateFlow<Tone?> = _tone
@@ -89,7 +95,7 @@ class ToneDetailViewModel(application: Application) : AndroidViewModel(applicati
                 } catch (e: Exception) {
                     android.util.Log.w("ToneDetail", "Failed to fetch tone detail: ${e.message}")
                     if (_tone.value == null) {
-                        _error.value = "Failed to load tone info"
+                        _error.value = ctx().getString(R.string.tone_failed_tone_info)
                     }
                 }
             }
@@ -103,14 +109,14 @@ class ToneDetailViewModel(application: Application) : AndroidViewModel(applicati
                 }
                 _models.value = modelsResult ?: emptyList()
                 if (modelsResult.isNullOrEmpty()) {
-                    _modelsError.value = "No models available for this tone"
+                    _modelsError.value = ctx().getString(R.string.tone_detail_no_models)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ToneDetail", "Failed to fetch models: ${e.message}")
                 if (e is ApiException && e.code == 401) {
-                    _modelsError.value = "Please login to view and download models"
+                    _modelsError.value = ctx().getString(R.string.tone_detail_login_required)
                 } else {
-                    _modelsError.value = "Failed to load models list"
+                    _modelsError.value = ctx().getString(R.string.tone_failed_models_list)
                 }
             } finally {
                 _isLoading.value = false
@@ -127,13 +133,21 @@ class ToneDetailViewModel(application: Application) : AndroidViewModel(applicati
                 val destFile = fileInfo.resolveFile(filesDir)
                 destFile.parentFile?.mkdirs()
 
-                _downloadStatus.emit("Downloading model ${model.name}...")
+                _downloadStatus.emit(ctx().getString(R.string.tone_downloading, model.name))
                 val success = withContext(Dispatchers.IO) {
-                    api.downloadFile(model.model_url, destFile)
+                    api.downloadFile(model.model_url, destFile) { done, total ->
+                        // 进度文案：优先百分比，总长未知时显示 MB
+                        val text = if (total > 0) {
+                            ctx().getString(R.string.tone_downloading_percent, model.name, done * 100 / total)
+                        } else {
+                            ctx().getString(R.string.tone_downloading_mb, model.name, done / 1024 / 1024)
+                        }
+                        _downloadStatus.tryEmit(text)
+                    }
                 }
 
                 if (success) {
-                    _downloadStatus.emit("Model downloaded: ${destFile.name}")
+                    _downloadStatus.emit(ctx().getString(R.string.tone_model_downloaded, destFile.name))
                     _downloadedModelIds.value = _downloadedModelIds.value + model.id
 
                     // If it's AIDA-X, also copy to neural_models so NAM can see it
@@ -150,15 +164,15 @@ class ToneDetailViewModel(application: Application) : AndroidViewModel(applicati
                         val pluginInfo = RackManager.getRackPluginInfo(_sourcePluginIndex)
                         if (pluginInfo != null) {
                             loadFileIntoPlugin(_sourcePluginIndex, fileInfo, destFile, _sourceSlot)
-                            _downloadStatus.emit("Model loaded into rack")
+                            _downloadStatus.emit(ctx().getString(R.string.tone_model_loaded))
                         }
                     }
                     // When _sourcePluginIndex == -1: download only, no auto-load
                 } else {
-                    _error.value = "Failed to download model file"
+                    _error.value = ctx().getString(R.string.tone_failed_download_file)
                 }
             } catch (e: Exception) {
-                _error.value = "Download failed: ${e.message}"
+                _error.value = ctx().getString(R.string.tone_err_download_failed_msg, e.message)
             } finally {
                 _isLoading.value = false
             }

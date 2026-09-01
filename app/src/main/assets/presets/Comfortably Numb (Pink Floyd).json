@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "presetName": "Comfortably Numb (Pink Floyd)",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+    "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_JCM2000_Clean.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": -10.0 },
+        { "index": 2, "value": 520.0 },
+        { "index": 3, "value": -10.0 },
+        { "index": 4, "value": 520.0 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 32.0 },
+        { "index": 2, "value": 0.6 },
+        { "index": 3, "value": 0.5 },
+        { "index": 4, "value": 0.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

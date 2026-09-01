@@ -23,7 +23,10 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.varcain.guitarrackcraft.R
 import com.varcain.guitarrackcraft.engine.AudioEngine
+import com.varcain.guitarrackcraft.engine.AudioForegroundService
+import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.engine.NativeEngine
 import com.varcain.guitarrackcraft.engine.PresetManager
 import com.varcain.guitarrackcraft.engine.RackManager
@@ -55,6 +58,9 @@ data class RackPlugin(
 }
 
 class RackViewModel(application: Application) : AndroidViewModel(application) {
+
+    /** 按当前应用语言返回包装后的上下文，用于解析本地化字符串。 */
+    private fun ctx(): Context = LanguageManager.wrapContext(getApplication())
 
     private val _isEngineRunning = MutableStateFlow(false)
     val isEngineRunning: StateFlow<Boolean> = _isEngineRunning.asStateFlow()
@@ -196,14 +202,45 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 _isEngineRunning.value = started
                 if (started) {
                     _errorMessage.value = null
+                    // 前台服务保活：切后台/锁屏后音频回调不被冻结
+                    AudioForegroundService.start(getApplication())
+                    // 禁用系统在输出会话上插入的音效（Dolby/MiSound 等）——
+                    // 它们会压缩/限幅吉他信号导致破音。OEM 策略可能在流启动
+                    // 后一小会儿才挂效果，所以延迟重试几次。
+                    disableSystemAudioEffects()
+                } else {
+                    // 启动失败也要给出明确反馈，避免“点了没反应”
+                    _errorMessage.value = ctx().getString(
+                        R.string.rack_err_start_engine,
+                        ctx().getString(R.string.rack_err_engine_audio_fail)
+                    )
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to start engine: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_start_engine, e.message)
             }
         }
     }
 
     private var restartJob: Job? = null
+
+    /**
+     * 禁用系统音效（Dolby/MiSound 等输出后处理）。OEM 音频策略可能在流
+     * 启动后延迟挂效果，因此立即尝试一次，之后在 1s / 3s 再各试一次。
+     */
+    private fun disableSystemAudioEffects() {
+        viewModelScope.launch {
+            for (delayMs in longArrayOf(0, 1000, 3000)) {
+                if (delayMs > 0) delay(delayMs)
+                if (!_isEngineRunning.value) return@launch
+                val sessionId = AudioEngine.getOutputSessionId()
+                if (sessionId > 0) {
+                    val n = com.varcain.guitarrackcraft.engine.AudioEffectDisabler
+                        .disableSystemEffects(sessionId)
+                    if (n > 0) return@launch
+                }
+            }
+        }
+    }
 
     fun restartEngine(context: Context) {
         restartJob?.cancel()
@@ -228,6 +265,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         android.util.Log.i("AudioLifecycle", "RackViewModel.stopEngine() -> native (thread=${Thread.currentThread().name})")
         stopRecording()
         AudioEngine.stop()
+        AudioForegroundService.stop(getApplication())
         _isEngineRunning.value = false
     }
 
@@ -236,13 +274,13 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             stopRecording()
         } else {
             if (!_isEngineRunning.value) {
-                _errorMessage.value = "Start the engine first to record"
+                _errorMessage.value = ctx().getString(R.string.rack_err_record_need_engine)
                 return
             }
             val started = RecordingManager.startRecording(context)
             _isRecording.value = started
             if (!started) {
-                _errorMessage.value = "Failed to start recording"
+                _errorMessage.value = ctx().getString(R.string.rack_err_start_recording)
             }
         }
     }
@@ -265,10 +303,10 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 if (RackManager.removePlugin(position)) {
                     updateRackState()
                 } else {
-                    _errorMessage.value = "Failed to remove plugin at position $position"
+                    _errorMessage.value = ctx().getString(R.string.rack_err_remove_plugin_pos, position)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to remove plugin: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_remove_plugin, e.message)
             }
         }
     }
@@ -279,10 +317,10 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 if (RackManager.reorder(fromPos, toPos)) {
                     updateRackState()
                 } else {
-                    _errorMessage.value = "Failed to reorder plugins"
+                    _errorMessage.value = ctx().getString(R.string.rack_err_reorder_plugins)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to reorder plugins: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_reorder_plugins_msg, e.message)
             }
         }
     }
@@ -295,7 +333,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (!AudioEngine.isRunning()) {
-                    _errorMessage.value = "Start the engine first to load a WAV file"
+                    _errorMessage.value = ctx().getString(R.string.rack_engine_needed_for_wav)
                     return@launch
                 }
                 val success = withContext(Dispatchers.IO) {
@@ -309,10 +347,10 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                     _loadedFileName.value = fileName ?: path.substringAfterLast('/')
                     _errorMessage.value = null
                 } else {
-                    _errorMessage.value = "Failed to load WAV file"
+                    _errorMessage.value = ctx().getString(R.string.rack_err_load_wav)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to load WAV: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_load_wav_msg, e.message)
             }
         }
     }
@@ -380,7 +418,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 com.varcain.guitarrackcraft.engine.NativeEngine.getInstance()
                     .setPluginFilePath(pluginIndex, propertyUri, filePath)
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to set file path: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_set_file_path, e.message)
             }
         }
     }
@@ -390,7 +428,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 RackManager.setParameter(pluginIndex, portIndex, value)
             } catch (e: Exception) {
-                _errorMessage.value = "Failed to set parameter: ${e.message}"
+                _errorMessage.value = ctx().getString(R.string.rack_err_set_parameter, e.message)
             }
         }
     }
@@ -441,7 +479,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             }
             android.util.Log.i("AudioLifecycle", "updateRackState: ok size=${plugins.size} forceNewInstanceIds=$forceNewInstanceIds")
         } catch (e: Exception) {
-            _errorMessage.value = "Failed to get rack plugins: ${e.message}"
+            _errorMessage.value = ctx().getString(R.string.rack_err_get_rack_plugins, e.message)
             android.util.Log.e("AudioLifecycle", "updateRackState: failed (keeping previous list to avoid tearing down X11 UIs): ${e.message}", e)
         }
     }
@@ -473,7 +511,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
     fun savePreset(ctx: Context, name: String) {
         viewModelScope.launch {
             val ok = try {
-                withBlockingOperation("Saving preset") {
+                withBlockingOperation(ctx().getString(R.string.rack_op_saving_preset)) {
                     withContext(Dispatchers.IO) {
                         presetManager.savePreset(ctx, name)
                     }
@@ -485,9 +523,9 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             if (ok) {
                 ensureRecentManager(ctx).addRecent(name)
                 refreshPresets(ctx)
-                _presetMessage.value = "Preset '$name' saved"
+                _presetMessage.value = ctx().getString(R.string.rack_preset_saved, name)
             } else {
-                _presetMessage.value = "Failed to save preset"
+                _presetMessage.value = ctx().getString(R.string.rack_preset_save_failed)
             }
         }
     }
@@ -496,7 +534,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val engine = NativeEngine.getInstance()
             val ok = try {
-                withBlockingOperation("Loading preset") {
+                withBlockingOperation(ctx().getString(R.string.rack_op_loading_preset)) {
                     val loaded = withContext(Dispatchers.IO) {
                         engine.setChainBypass(true)
                         try {
@@ -517,9 +555,9 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 false
             }
             if (ok) {
-                _presetMessage.value = "Preset '$name' loaded"
+                _presetMessage.value = ctx().getString(R.string.rack_preset_loaded, name)
             } else {
-                _presetMessage.value = "Failed to load preset (plugin count mismatch?)"
+                _presetMessage.value = ctx().getString(R.string.rack_preset_load_failed_mismatch)
             }
         }
     }
@@ -528,7 +566,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val engine = NativeEngine.getInstance()
             val ok = try {
-                withBlockingOperation("Loading preset") {
+                withBlockingOperation(ctx().getString(R.string.rack_op_loading_preset)) {
                     val loaded = withContext(Dispatchers.IO) {
                         engine.setChainBypass(true)
                         try {
@@ -547,9 +585,9 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
                 false
             }
             if (ok) {
-                _presetMessage.value = "Recording preset loaded"
+                _presetMessage.value = ctx().getString(R.string.rack_recording_preset_loaded)
             } else {
-                _presetMessage.value = "Failed to load recording preset"
+                _presetMessage.value = ctx().getString(R.string.rack_recording_preset_failed)
             }
         }
     }
@@ -559,7 +597,7 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             presetManager.deletePreset(ctx, name)
             ensureRecentManager(ctx).removeRecent(name)
             refreshPresets(ctx)
-            _presetMessage.value = "Preset '$name' deleted"
+            _presetMessage.value = ctx().getString(R.string.rack_preset_deleted, name)
         }
     }
 

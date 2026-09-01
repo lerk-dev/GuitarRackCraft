@@ -34,9 +34,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import com.varcain.guitarrackcraft.R
 import com.varcain.guitarrackcraft.engine.RecordingEntry
 import com.varcain.guitarrackcraft.engine.RecordingManager
 import com.varcain.guitarrackcraft.engine.hasPreset
@@ -58,10 +60,10 @@ fun RecordingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Recordings") },
+                title = { Text(stringResource(R.string.rec_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onNavigateBack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -75,7 +77,7 @@ fun RecordingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "No recordings yet.\nUse the Record button to capture audio.",
+                    stringResource(R.string.rec_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -102,7 +104,7 @@ fun RecordingsScreen(
                                 putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf(rawUri, procUri))
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Share Recording"))
+                            context.startActivity(Intent.createChooser(intent, context.getString(R.string.rec_share_chooser)))
                         },
                         onLoadPreset = { json -> onLoadRecordingPreset(json) },
                         onDelete = { deleteTarget = entry }
@@ -116,20 +118,20 @@ fun RecordingsScreen(
     deleteTarget?.let { entry ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("Delete Recording") },
-            text = { Text("Delete recording from ${entry.displayName}? This cannot be undone.") },
+            title = { Text(stringResource(R.string.rec_delete_title)) },
+            text = { Text(stringResource(R.string.rec_delete_text, entry.displayName)) },
             confirmButton = {
                 TextButton(onClick = {
                     RecordingManager.deleteRecording(entry)
                     recordings = RecordingManager.listRecordings(context)
                     deleteTarget = null
                 }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
@@ -161,7 +163,7 @@ private fun RecordingCard(
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = formatDuration(entry.durationSec),
+                text = formatDurationText(entry.durationSec),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -174,14 +176,14 @@ private fun RecordingCard(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("Play Raw", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.rec_play_raw), style = MaterialTheme.typography.labelSmall)
                 }
                 OutlinedButton(
                     onClick = onPlayProcessed,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("Play Processed", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.rec_play_processed), style = MaterialTheme.typography.labelSmall)
                 }
                 Box {
                     IconButton(
@@ -191,7 +193,7 @@ private fun RecordingCard(
                     ) {
                         Icon(
                             Icons.Default.LibraryMusic,
-                            contentDescription = "Preset",
+                            contentDescription = stringResource(R.string.rec_preset),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -200,14 +202,14 @@ private fun RecordingCard(
                         onDismissRequest = { presetMenuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Load Preset") },
+                            text = { Text(stringResource(R.string.rec_load_preset)) },
                             onClick = {
                                 presetMenuExpanded = false
                                 entry.readPresetJson()?.let { onLoadPreset(it) }
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Share Preset") },
+                            text = { Text(stringResource(R.string.rec_share_preset)) },
                             onClick = {
                                 presetMenuExpanded = false
                                 entry.readPresetJson()?.let { json ->
@@ -215,19 +217,19 @@ private fun RecordingCard(
                                         type = "text/plain"
                                         putExtra(Intent.EXTRA_TEXT, json)
                                     }
-                                    context.startActivity(Intent.createChooser(intent, "Share Preset"))
+                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.rec_share_preset_chooser)))
                                 }
                             }
                         )
                     }
                 }
                 IconButton(onClick = onShare, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share), modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete",
+                        contentDescription = stringResource(R.string.common_delete),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp)
                     )
@@ -237,9 +239,10 @@ private fun RecordingCard(
     }
 }
 
-private fun formatDuration(seconds: Double): String {
+@Composable
+private fun formatDurationText(seconds: Double): String {
     val totalSec = seconds.toInt()
     val min = totalSec / 60
     val sec = totalSec % 60
-    return "Duration: %d:%02d".format(min, sec)
+    return stringResource(R.string.rec_duration, min, sec)
 }

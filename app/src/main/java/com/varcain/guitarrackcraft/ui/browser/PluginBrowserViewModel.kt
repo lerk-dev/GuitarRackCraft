@@ -23,7 +23,9 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.varcain.guitarrackcraft.R
 import com.varcain.guitarrackcraft.engine.FavoritesManager
+import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.engine.PluginInfo
 import com.varcain.guitarrackcraft.engine.RackManager
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +100,35 @@ object PluginCategoryMapping {
         "AnalyserPlugin" to "Utility"
     )
 
+    /** 分类显示名 → 字符串资源 ID（用于本地化）；未收录的保留原英文名。 */
+    private val CATEGORY_RES = mapOf(
+        "Distortion" to R.string.browser_cat_distortion,
+        "Amplifier" to R.string.browser_cat_amplifier,
+        "Simulator" to R.string.browser_cat_simulator,
+        "Delay" to R.string.browser_cat_delay,
+        "Modulator" to R.string.browser_cat_modulator,
+        "Filter" to R.string.browser_cat_filter,
+        "Reverb" to R.string.browser_cat_reverb,
+        "EQ" to R.string.browser_cat_eq,
+        "Compressor" to R.string.browser_cat_compressor,
+        "Pitch" to R.string.browser_cat_pitch,
+        "Dynamics" to R.string.browser_cat_dynamics,
+        "Utility" to R.string.browser_cat_utility,
+        "Other" to R.string.browser_cat_other
+    )
+
+    /** 作者组显示名 → 字符串资源 ID。品牌名（GxPlugins 等）不翻译，仅收录需本地化的。 */
+    private val AUTHOR_RES = mapOf(
+        "Unknown" to R.string.browser_author_unknown,
+        "Windows VST" to R.string.browser_author_windows_vst
+    )
+
+    /** 分类显示名对应的字符串资源 ID；未收录返回 null（UI 回退原英文名）。 */
+    fun categoryResId(name: String): Int? = CATEGORY_RES[name]
+
+    /** 作者组显示名对应的字符串资源 ID；未收录返回 null（UI 回退原英文名）。 */
+    fun authorResId(name: String): Int? = AUTHOR_RES[name]
+
     /**
      * Determines the category for a plugin using metadata LV2 class.
      * Falls back to "Other" if no class is found.
@@ -141,6 +172,9 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private val appContext: Context = application.applicationContext
+
+    /** 按当前应用语言返回包装后的上下文，用于解析本地化字符串。 */
+    private fun ctx(): Context = LanguageManager.wrapContext(appContext)
     
     private val _plugins = MutableStateFlow<List<PluginInfo>>(emptyList())
     val plugins: StateFlow<List<PluginInfo>> = _plugins.asStateFlow()
@@ -191,9 +225,30 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
      */
     private fun loadMetadata() {
         try {
+            // 始终以英文元数据为基准加载（含 thumbnails/authors/categories/availablePlugins 等完整字段），
+            // 中文模式下用 plugin_metadata_zh.json 的描述覆盖，避免分类/作者等字段丢失。
+            val useZh = LanguageManager.getLocale(appContext).language == "zh"
             appContext.assets.open("plugin_metadata.json").use { inputStream ->
                 val jsonString = inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(jsonString)
+
+                if (useZh) {
+                    try {
+                        appContext.assets.open("plugin_metadata_zh.json").use { zhInput ->
+                            val zhJson = JSONObject(zhInput.bufferedReader().use { it.readText() })
+                            val zhDesc = zhJson.optJSONObject("descriptions")
+                            if (zhDesc != null) {
+                                val merged = json.optJSONObject("descriptions") ?: JSONObject()
+                                zhDesc.keys().forEach { key ->
+                                    merged.put(key, zhDesc.optString(key, ""))
+                                }
+                                json.put("descriptions", merged)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("PluginBrowser", "Failed to load zh descriptions: ${e.message}")
+                    }
+                }
                 
                 val descriptions = mutableMapOf<String, String>()
                 val thumbnails = mutableMapOf<String, String>()
@@ -329,7 +384,7 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
             _plugins.value = filteredPlugins
             _groupedPlugins.value = groupPluginsByAuthorAndCategory(filteredPlugins)
         } catch (e: Exception) {
-            _errorMessage.value = "Failed to load plugins: ${e.message}"
+            _errorMessage.value = ctx().getString(R.string.browser_err_load_plugins, e.message)
         } finally {
             _isLoading.value = false
         }
@@ -433,7 +488,7 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
 
     suspend fun addPluginToRack(plugin: PluginInfo, position: Int = -1): Boolean {
         if (_blockingOperation.value != null) return false
-        return withBlockingOperation("Adding plugin") {
+        return withBlockingOperation(ctx().getString(R.string.browser_op_adding_plugin)) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 // Off the main thread because for VST plugins, RackManager.addPlugin
                 // chains through WineVstPlugin::activate() which can block for ~5s
@@ -447,12 +502,12 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
                     if (index >= 0) {
                         true
                     } else {
-                        _addFailureMessage.value = "Could not add plugin. Plugin binaries (.so) are not included in this build—only metadata is available."
+                        _addFailureMessage.value = ctx().getString(R.string.browser_err_add_no_binaries)
                         false
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("PluginBrowser", "[LIFECYCLE] addPluginToRack failed: ${plugin.name}", e)
-                    _addFailureMessage.value = "Failed to add plugin: ${e.message}"
+                    _addFailureMessage.value = ctx().getString(R.string.browser_err_add_plugin, e.message)
                     false
                 }
             }
@@ -461,7 +516,7 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
 
     suspend fun replacePluginInRack(position: Int, plugin: PluginInfo): Boolean {
         if (_blockingOperation.value != null) return false
-        return withBlockingOperation("Replacing plugin") {
+        return withBlockingOperation(ctx().getString(R.string.browser_op_replacing_plugin)) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 // Same off-main-thread reason as addPluginToRack — VST replace
                 // triggers activate() which blocks on guest_ready.
@@ -473,12 +528,12 @@ class PluginBrowserViewModel(application: Application) : AndroidViewModel(applic
                     if (index >= 0) {
                         true
                     } else {
-                        _addFailureMessage.value = "Could not add plugin. Plugin binaries (.so) are not included in this build—only metadata is available."
+                        _addFailureMessage.value = ctx().getString(R.string.browser_err_add_no_binaries)
                         false
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("PluginBrowser", "[LIFECYCLE] replacePluginInRack failed: ${plugin.name}", e)
-                    _addFailureMessage.value = "Failed to replace plugin: ${e.message}"
+                    _addFailureMessage.value = ctx().getString(R.string.browser_err_replace_plugin, e.message)
                     false
                 }
             }

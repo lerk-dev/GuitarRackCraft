@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "presetName": "Europa (Santana)",
+  "timestamp": 1787900005000,
+  "pluginUris": [
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+    "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Roman_A_LT_MESA_MARKIV_1.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": -14.0 },
+        { "index": 2, "value": 480.0 },
+        { "index": 3, "value": -14.0 },
+        { "index": 4, "value": 480.0 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 22.0 },
+        { "index": 2, "value": 0.55 },
+        { "index": 3, "value": 0.6 },
+        { "index": 4, "value": 0.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

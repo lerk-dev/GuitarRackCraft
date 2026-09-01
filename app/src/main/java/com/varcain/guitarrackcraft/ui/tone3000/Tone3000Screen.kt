@@ -25,6 +25,8 @@ import android.widget.Toast
 import java.net.URLEncoder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -50,12 +52,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.varcain.guitarrackcraft.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -127,10 +131,10 @@ fun Tone3000Screen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("TONE3000", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.tone_title), fontWeight = FontWeight.Bold)
                         if (isAuthenticated) {
                             Text(
-                                text = user?.username ?: "Authenticated",
+                                text = user?.username ?: stringResource(R.string.tone_authenticated),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -139,7 +143,7 @@ fun Tone3000Screen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -147,7 +151,7 @@ fun Tone3000Screen(
                         IconButton(onClick = { viewModel.logout() }) {
                             Icon(
                                 Icons.Default.ExitToApp,
-                                contentDescription = "Logout",
+                                contentDescription = stringResource(R.string.tone_logout),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -163,7 +167,7 @@ fun Tone3000Screen(
                         ) {
                             Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Login")
+                            Text(stringResource(R.string.tone_login))
                         }
                     }
                 },
@@ -193,7 +197,7 @@ fun Tone3000Screen(
                         viewModel.searchTones(it)
                     },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Search tones...") },
+                    placeholder = { Text(stringResource(R.string.tone_search_placeholder)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Search,
@@ -216,7 +220,7 @@ fun Tone3000Screen(
                     IconButton(onClick = { showFilterSheet = true }) {
                         Icon(
                             Icons.Default.FilterList,
-                            contentDescription = "Filters",
+                            contentDescription = stringResource(R.string.tone_filters),
                             tint = if (activeFilterCount > 0) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -235,7 +239,7 @@ fun Tone3000Screen(
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(
                             Icons.Default.Sort,
-                            contentDescription = "Sort",
+                            contentDescription = stringResource(R.string.tone_sort),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -290,12 +294,12 @@ fun Tone3000Screen(
                             }
                         }
                         Text(
-                            text = "Browse thousands of tones",
+                            text = stringResource(R.string.tone_browse_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Sign in with your TONE3000 account to discover and download amp models, IRs, and more.",
+                            text = stringResource(R.string.tone_login_prompt),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.widthIn(max = 280.dp)
@@ -313,7 +317,7 @@ fun Tone3000Screen(
                         ) {
                             Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Login with TONE3000")
+                            Text(stringResource(R.string.tone_login_button))
                         }
                     }
                 }
@@ -326,12 +330,12 @@ fun Tone3000Screen(
                         modifier = Modifier.padding(32.dp)
                     ) {
                         Text(
-                            text = error ?: "Something went wrong",
+                            text = error ?: stringResource(R.string.tone_error_default),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         FilledTonalButton(onClick = { viewModel.searchTones(searchQuery) }) {
-                            Text("Retry")
+                            Text(stringResource(R.string.common_retry))
                         }
                     }
                 }
@@ -397,35 +401,37 @@ fun Tone3000Screen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 32.dp)
+                    .padding(bottom = 24.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Filters", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.tone_filters), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     if (activeFilterCount > 0) {
                         TextButton(onClick = { viewModel.clearFilters() }) {
-                            Text("Clear All")
+                            Text(stringResource(R.string.tone_clear_all))
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                FilterSection(title = "Gear") {
+                FilterSection(title = stringResource(R.string.tone_section_gear)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(
-                            "amp" to "Amp Head",
-                            "amp-cab" to "Amp Cab / Combo",
-                            "pedal" to "Pedal",
-                            "outboard" to "Outboard"
-                        ).forEach { (value, label) ->
+                        val gearOptions = listOf(
+                            "amp" to stringResource(R.string.tone_gear_amp_head),
+                            "amp-cab" to stringResource(R.string.tone_gear_amp_cab),
+                            "pedal" to stringResource(R.string.tone_gear_pedal),
+                            "outboard" to stringResource(R.string.tone_gear_outboard)
+                        )
+                        gearOptions.forEach { (value, label) ->
                             FilterChip(
                                 selected = selectedGear == value,
                                 onClick = { viewModel.setGearFilter(if (selectedGear == value) null else value) },
@@ -435,7 +441,7 @@ fun Tone3000Screen(
                     }
                 }
 
-                FilterSection(title = "Format") {
+                FilterSection(title = stringResource(R.string.tone_section_format)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -451,7 +457,7 @@ fun Tone3000Screen(
                     }
                 }
 
-                FilterSection(title = "Tags") {
+                FilterSection(title = stringResource(R.string.tone_section_tags)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -467,7 +473,7 @@ fun Tone3000Screen(
                     }
                 }
 
-                FilterSection(title = "Model Size") {
+                FilterSection(title = stringResource(R.string.tone_section_size)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -483,7 +489,7 @@ fun Tone3000Screen(
                     }
                 }
 
-                FilterSection(title = "Architecture") {
+                FilterSection(title = stringResource(R.string.tone_section_architecture)) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -503,19 +509,37 @@ fun Tone3000Screen(
                     }
                 }
 
-                FilterSection(title = "Calibrated") {
+                FilterSection(title = stringResource(R.string.tone_section_calibrated)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = isCalibrated == true,
                             onClick = { viewModel.setCalibrated(if (isCalibrated == true) null else true) },
-                            label = { Text("Yes") }
+                            label = { Text(stringResource(R.string.tone_yes)) }
                         )
                         FilterChip(
                             selected = isCalibrated == false,
                             onClick = { viewModel.setCalibrated(if (isCalibrated == false) null else false) },
-                            label = { Text("No") }
+                            label = { Text(stringResource(R.string.tone_no)) }
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        showFilterSheet = false
+                        viewModel.searchTones(searchQuery)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.tone_apply_filters),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -534,7 +558,7 @@ fun Tone3000Screen(
                     .padding(bottom = 32.dp)
             ) {
                 Text(
-                    text = "Select Model",
+                    text = stringResource(R.string.tone_select_model),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -646,7 +670,7 @@ private fun ModelSelectionItem(
                     ) {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Load",
+                            contentDescription = stringResource(R.string.tone_load),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -663,7 +687,7 @@ private fun ModelSelectionItem(
                     ) {
                         Icon(
                             Icons.Default.Check,
-                            contentDescription = "Downloaded",
+                            contentDescription = stringResource(R.string.tone_downloaded),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -679,7 +703,7 @@ private fun ModelSelectionItem(
                     ) {
                         Icon(
                             Icons.Default.Download,
-                            contentDescription = "Download",
+                            contentDescription = stringResource(R.string.tone_download),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -760,7 +784,7 @@ fun ToneItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = tone.user?.username ?: "Unknown",
+                    text = tone.user?.username ?: stringResource(R.string.common_unknown),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -781,7 +805,7 @@ fun ToneItem(
                         )
                     }
                     Text(
-                        text = "${tone.modelCountFor(architecture)} models",
+                        text = stringResource(R.string.tone_models_count, tone.modelCountFor(architecture)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -798,7 +822,7 @@ fun ToneItem(
             ) {
                 Icon(
                     Icons.Default.Download,
-                    contentDescription = "Download",
+                    contentDescription = stringResource(R.string.tone_download),
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )

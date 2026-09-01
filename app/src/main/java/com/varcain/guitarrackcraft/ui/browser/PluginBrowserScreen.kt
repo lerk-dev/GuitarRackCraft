@@ -43,8 +43,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,6 +63,7 @@ import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.varcain.guitarrackcraft.engine.PluginInfo
 import com.varcain.guitarrackcraft.engine.UiType
+import com.varcain.guitarrackcraft.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -111,15 +114,15 @@ fun PluginBrowserScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    title = { Text("Plugin Browser") },
+                    title = { Text(stringResource(R.string.browser_title)) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.common_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = { viewModel.refresh() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.browser_refresh))
                         }
                     }
                 )
@@ -145,12 +148,12 @@ fun PluginBrowserScreen(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = errorMessage ?: "Unknown error",
+                                text = errorMessage ?: stringResource(R.string.browser_unknown_error),
                                 color = MaterialTheme.colorScheme.error
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(onClick = { viewModel.refresh() }) {
-                                Text("Retry")
+                                Text(stringResource(R.string.common_retry))
                             }
                         }
                     }
@@ -162,10 +165,10 @@ fun PluginBrowserScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text("No plugins available")
+                            Text(stringResource(R.string.browser_no_plugins))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "LV2 plugins are loaded from the app's extracted assets (assets/lv2). This app ships with GxPlugins in assets—if you see nothing here, the native build may be using the LV2 stub (no lilv/serd/sord). Build the LV2 libraries and place them in app/src/main/cpp/libs/lv2/, then rebuild the app. See LV2_INTEGRATION.md.",
+                                text = stringResource(R.string.browser_empty_hint),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -179,8 +182,15 @@ fun PluginBrowserScreen(
                             groupedPlugins.forEach { authorGroup ->
                                 // Author header
                                 item(key = "author_${authorGroup.name}") {
+                                    val authorRes = PluginCategoryMapping.authorResId(authorGroup.name)
+                                    val authorName = when {
+                                        authorGroup.name == PluginBrowserViewModel.FAVORITES_GROUP ->
+                                            stringResource(R.string.rack_favorites)
+                                        authorRes != null -> stringResource(authorRes)
+                                        else -> authorGroup.name
+                                    }
                                     AuthorHeader(
-                                        authorName = authorGroup.name,
+                                        authorName = authorName,
                                         pluginCount = authorGroup.categories.sumOf { it.plugins.size },
                                         isExpanded = expandedAuthors.contains(authorGroup.name),
                                         onToggle = { viewModel.toggleAuthor(authorGroup.name) }
@@ -195,8 +205,9 @@ fun PluginBrowserScreen(
 
                                         // Category header
                                         item(key = "category_${categoryKey}") {
+                                            val catRes = PluginCategoryMapping.categoryResId(category.name)
                                             CategoryHeader(
-                                                categoryName = category.name,
+                                                categoryName = catRes?.let { stringResource(it) } ?: category.name,
                                                 pluginCount = category.plugins.size,
                                                 isExpanded = isCategoryExpanded,
                                                 onToggle = {
@@ -316,7 +327,7 @@ fun AuthorHeader(
             ) {
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    contentDescription = if (isExpanded) stringResource(R.string.rack_collapse) else stringResource(R.string.rack_expand),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
@@ -327,7 +338,7 @@ fun AuthorHeader(
                 )
             }
             Text(
-                text = "$pluginCount plugins",
+                text = stringResource(R.string.browser_plugin_count, pluginCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
@@ -363,7 +374,7 @@ fun CategoryHeader(
             ) {
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    contentDescription = if (isExpanded) stringResource(R.string.rack_collapse) else stringResource(R.string.rack_expand),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
@@ -390,8 +401,13 @@ fun PluginThumbnail(
 ) {
     val context = LocalContext.current
     
-    val bitmap = produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, thumbnailPath) {
-        value = withContext(Dispatchers.IO) {
+    // produceState 等价写法；原 produceState 在 K2 UAST lint 下存在误报
+    // （ProduceStateDoesNotAssignValue 无法解析隐式接收者的 value 赋值）
+    var bitmap by remember(thumbnailPath) {
+        mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    }
+    LaunchedEffect(thumbnailPath) {
+        bitmap = withContext(Dispatchers.IO) {
             try {
                 if (thumbnailPath.isNotEmpty()) {
                     context.assets.open("lv2/$thumbnailPath").use { inputStream ->
@@ -410,10 +426,10 @@ fun PluginThumbnail(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        bitmap.value?.let { imageBitmap ->
+        bitmap?.let { imageBitmap ->
             Image(
                 bitmap = imageBitmap,
-                contentDescription = "Plugin thumbnail",
+                contentDescription = stringResource(R.string.browser_plugin_thumbnail),
                 modifier = Modifier.fillMaxSize()
             )
         } ?: run {
@@ -541,7 +557,7 @@ fun PluginItem(
             IconButton(onClick = onToggleFavorite) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.Star,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    contentDescription = if (isFavorite) stringResource(R.string.browser_remove_favorites) else stringResource(R.string.browser_add_favorites),
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

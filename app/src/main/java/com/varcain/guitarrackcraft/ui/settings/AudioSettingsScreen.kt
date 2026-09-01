@@ -19,6 +19,8 @@
 
 package com.varcain.guitarrackcraft.ui.settings
 
+import android.app.Activity
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -29,15 +31,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.varcain.guitarrackcraft.R
 import com.varcain.guitarrackcraft.engine.AudioDeviceOption
 import com.varcain.guitarrackcraft.engine.AudioEngine
 import com.varcain.guitarrackcraft.engine.AudioSettingsManager
+import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.ui.rack.RackViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,10 +66,10 @@ fun AudioSettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Audio Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onNavigateBack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -78,9 +83,14 @@ fun AudioSettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // 语言选项
+            LanguageDropdown()
+
+            Divider()
+
             // Input device selector
             DeviceDropdown(
-                label = "Input Device",
+                label = stringResource(R.string.settings_input_device),
                 devices = inputDevices,
                 selectedId = selectedInputId,
                 onSelected = { id ->
@@ -93,7 +103,7 @@ fun AudioSettingsScreen(
 
             // Output device selector
             DeviceDropdown(
-                label = "Output Device",
+                label = stringResource(R.string.settings_output_device),
                 devices = outputDevices,
                 selectedId = selectedOutputId,
                 onSelected = { id ->
@@ -116,7 +126,7 @@ fun AudioSettingsScreen(
             )
 
             Text(
-                text = "Lower buffer sizes reduce latency but increase CPU usage. Use Auto unless you experience issues.",
+                text = stringResource(R.string.settings_buffer_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -130,37 +140,102 @@ fun AudioSettingsScreen(
 
                 Divider()
                 Text(
-                    text = "Current Session",
+                    text = stringResource(R.string.settings_current_session),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
-                InfoRow("Sample Rate", "%.0f Hz".format(sampleRate))
-                InfoRow("Buffer Size", "$bufferFrames frames")
-                InfoRow("Burst Size", "${streamInfo.framesPerBurst} frames")
-                InfoRow("Audio Format", "32-bit Float")
+                InfoRow(stringResource(R.string.settings_sample_rate), "%.0f Hz".format(sampleRate))
+                InfoRow(stringResource(R.string.settings_buffer_size), "$bufferFrames frames")
+                InfoRow(stringResource(R.string.settings_burst_size), "${streamInfo.framesPerBurst} frames")
+                InfoRow(stringResource(R.string.settings_audio_format), stringResource(R.string.settings_32bit_float))
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Divider()
                 Text(
-                    text = "Low-Latency Checklist",
+                    text = stringResource(R.string.settings_low_latency_checklist),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "Based on developer.android.com/games/sdk/oboe/low-latency-audio",
+                    text = stringResource(R.string.settings_checklist_ref),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                ChecklistItem("Oboe API", true)
-                ChecklistItem("AAudio backend", streamInfo.isAAudio, "OpenSL ES")
-                ChecklistItem("Performance: Low Latency", streamInfo.outputLowLatency)
-                ChecklistItem("Sharing: Exclusive (output)", streamInfo.outputExclusive, "Shared")
-                ChecklistItem("Sharing: Exclusive (input)", streamInfo.inputExclusive, "Shared")
-                ChecklistItem("Sample rate: 48000 Hz", sampleRate.toInt() == 48000, "%.0f Hz".format(sampleRate))
-                ChecklistItem("Data callback", streamInfo.outputCallback)
-                ChecklistItem("MMAP buffer", streamInfo.outputMMap)
+                ChecklistItem(stringResource(R.string.settings_oboe_api), true)
+                ChecklistItem(stringResource(R.string.settings_aaudio_backend), streamInfo.isAAudio, "OpenSL ES")
+                ChecklistItem(stringResource(R.string.settings_perf_low_latency), streamInfo.outputLowLatency)
+                ChecklistItem(stringResource(R.string.settings_sharing_exclusive_output), streamInfo.outputExclusive, stringResource(R.string.common_share))
+                ChecklistItem(stringResource(R.string.settings_sharing_exclusive_input), streamInfo.inputExclusive, stringResource(R.string.common_share))
+                ChecklistItem(stringResource(R.string.settings_sample_rate_48000), sampleRate.toInt() == 48000, "%.0f Hz".format(sampleRate))
+                ChecklistItem(stringResource(R.string.settings_data_callback), streamInfo.outputCallback)
+                ChecklistItem(stringResource(R.string.settings_mmap_buffer), streamInfo.outputMMap)
+            }
+        }
+    }
+}
+
+/** 语言选择下拉框：跟随系统 / English / 简体中文，切换后立即生效。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageDropdown() {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    var expanded by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(LanguageManager.getLanguage(context)) }
+
+    val options = listOf(
+        LanguageManager.LANG_SYSTEM to stringResource(R.string.lang_system),
+        LanguageManager.LANG_EN to stringResource(R.string.lang_english),
+        LanguageManager.LANG_ZH to stringResource(R.string.lang_chinese)
+    )
+
+    Column {
+        Text(
+            text = stringResource(R.string.settings_language),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = options.find { it.first == selected }?.second ?: stringResource(R.string.lang_system),
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { (lang, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            selected = lang
+                            expanded = false
+                            LanguageManager.setLanguage(context, lang)
+                            // Android 13+：写入系统 LocaleManager，由系统重建界面；
+                            // 低版本：重建 Activity 触发 attachBaseContext 应用语言。
+                            if (Build.VERSION.SDK_INT >= 33) {
+                                val lm = context.getSystemService(android.app.LocaleManager::class.java)
+                                lm.applicationLocales = if (lang == LanguageManager.LANG_SYSTEM) {
+                                    android.os.LocaleList.getEmptyLocaleList()
+                                } else {
+                                    android.os.LocaleList(LanguageManager.getLocale(context))
+                                }
+                            } else {
+                                activity?.recreate()
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -240,7 +315,7 @@ private fun DeviceDropdown(
             onExpandedChange = { expanded = it }
         ) {
             OutlinedTextField(
-                value = selectedDevice?.name ?: "Default",
+                value = selectedDevice?.name ?: stringResource(R.string.settings_default_device),
                 onValueChange = {},
                 readOnly = true,
                 modifier = Modifier
@@ -274,11 +349,13 @@ private fun BufferSizeDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val options = AudioSettingsManager.BUFFER_SIZE_OPTIONS
-    val selectedLabel = options.find { it.first == selectedSize }?.second ?: "Auto"
+    val autoLabel = stringResource(R.string.rack_buffer_auto)
+    val selectedLabel = if (selectedSize == 0) autoLabel
+        else options.find { it.first == selectedSize }?.second ?: autoLabel
 
     Column {
         Text(
-            text = "Buffer Size",
+            text = stringResource(R.string.settings_buffer_size),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(bottom = 4.dp)
         )
@@ -301,7 +378,7 @@ private fun BufferSizeDropdown(
             ) {
                 options.forEach { (size, label) ->
                     DropdownMenuItem(
-                        text = { Text(label) },
+                        text = { Text(if (size == 0) autoLabel else label) },
                         onClick = {
                             onSelected(size)
                             expanded = false

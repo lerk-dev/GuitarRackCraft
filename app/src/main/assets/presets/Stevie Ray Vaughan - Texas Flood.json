@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "presetName": "Stevie Ray Vaughan - Texas Flood",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+    "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_compressor#_compressor",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 3.5 },
+        { "index": 1, "value": 5.0 },
+        { "index": 2, "value": -30.0 },
+        { "index": 3, "value": 0.5 },
+        { "index": 4, "value": 0.002 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": 800.0 },
+        { "index": 2, "value": 0.6 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_Fender_TwinVerb_Vibrato_Bright.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.3 },
+        { "index": 1, "value": 0.02 },
+        { "index": 2, "value": 0.2 },
+        { "index": 3, "value": 2.5 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

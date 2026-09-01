@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "presetName": "Sweet Child O' Mine (Guns N' Roses)",
+  "timestamp": 1787900000000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+    "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": 600.0 },
+        { "index": 2, "value": 0.5 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Tim_R_JCM2000_Crunch.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_chorus_stereo#_chorus_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.6 },
+        { "index": 1, "value": 0.025 },
+        { "index": 2, "value": 0.4 },
+        { "index": 3, "value": 2.5 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_delay_stereo#_delay_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.0 },
+        { "index": 1, "value": -16.0 },
+        { "index": 2, "value": 380.0 },
+        { "index": 3, "value": -16.0 },
+        { "index": 4, "value": 380.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

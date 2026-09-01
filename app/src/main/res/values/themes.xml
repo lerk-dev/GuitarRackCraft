@@ -19,7 +19,7 @@
 -->
 <resources>
     <style name="Theme.GuitarRackCraft" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- windowLayoutInDisplayCutoutMode 是 API 27+，见 values-v27/themes.xml -->
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>

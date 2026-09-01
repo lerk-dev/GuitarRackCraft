@@ -99,6 +99,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,6 +119,7 @@ import com.varcain.guitarrackcraft.engine.RackManager
 import com.varcain.guitarrackcraft.engine.X11Bridge
 import com.varcain.guitarrackcraft.engine.PluginInfo
 import com.varcain.guitarrackcraft.engine.UiType
+import com.varcain.guitarrackcraft.R
 import com.varcain.guitarrackcraft.ui.modgui.InlineModguiView
 import com.varcain.guitarrackcraft.ui.x11.PluginX11UiView
 import com.varcain.guitarrackcraft.ui.x11.X11DisplayManager
@@ -370,11 +372,11 @@ fun RackScreen(
             topBar = {
             if (isFullscreenActive) return@Scaffold
             val statusText = if (isEngineRunning) {
-                var s = "Running · %.1f ms · CPU %.0f%%".format(latencyMs, cpuLoad * 100f)
-                if (xRunCount > 0) s += " · XRuns $xRunCount"
-                if (inputClipping || outputClipping) s += " · Clip!"
+                var s = stringResource(R.string.rack_status_running, latencyMs, cpuLoad * 100f)
+                if (xRunCount > 0) s += stringResource(R.string.rack_status_xruns, xRunCount)
+                if (inputClipping || outputClipping) s += stringResource(R.string.rack_status_clip)
                 s
-            } else "Stopped"
+            } else stringResource(R.string.rack_status_stopped)
             val statusColor = if (inputClipping || outputClipping)
                 MaterialTheme.colorScheme.error
             else
@@ -386,14 +388,17 @@ fun RackScreen(
             // Get actual cutout bounds to center VU meters in each half
             val view = LocalView.current
             val density = LocalDensity.current
-            val displayCutout = view.rootWindowInsets?.displayCutout
+            // DisplayCutout/getBoundingRects 是 API 28+；minSdk=26 设备上
+            // 访问会 NoSuchMethodError，统一在版本分支内取出 Rect 列表
+            val cutoutRects: List<android.graphics.Rect> = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                view.rootWindowInsets?.displayCutout?.boundingRects ?: emptyList()
+            } else emptyList()
             val screenWidthPx = view.width.toFloat()
             // Find the cutout center zone (left edge to right edge) with generous padding
             val cutoutCenterStartDp: Dp
             val cutoutCenterEndDp: Dp
-            if (displayCutout != null && displayCutout.boundingRects.isNotEmpty()) {
-                val topCutout = displayCutout.boundingRects.firstOrNull { it.top == 0 }
-                    ?: displayCutout.boundingRects[0]
+            if (cutoutRects.isNotEmpty()) {
+                val topCutout = cutoutRects.firstOrNull { it.top == 0 } ?: cutoutRects[0]
                 val extraPadding = with(density) { 4.dp.toPx() }
                 cutoutCenterStartDp = with(density) { (topCutout.left - extraPadding).coerceAtLeast(0f).toDp() }
                 cutoutCenterEndDp = with(density) { (screenWidthPx - topCutout.right - extraPadding).coerceAtLeast(0f).toDp() }
@@ -409,7 +414,7 @@ fun RackScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // VU meters row — sits inside the cutout/status bar area
                     if (isEngineRunning) {
-                        BoxWithConstraints(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(cutoutTop)
@@ -429,7 +434,7 @@ fun RackScreen(
                                 ) {
                                     VuMeter(
                                         modifier = Modifier.width(meterWidth),
-                                        label = "In",
+                                        label = stringResource(R.string.rack_in),
                                         level = inputLevel,
                                         clipping = inputClipping,
                                         onClippingTap = { viewModel.resetClipping() }
@@ -442,7 +447,7 @@ fun RackScreen(
                                 ) {
                                     VuMeter(
                                         modifier = Modifier.width(meterWidth),
-                                        label = "Out",
+                                        label = stringResource(R.string.rack_out),
                                         level = outputLevel,
                                         clipping = outputClipping,
                                         onClippingTap = { viewModel.resetClipping() }
@@ -473,7 +478,7 @@ fun RackScreen(
                         )
                         // Quick buffer size selector
                         val bufferLabel = AudioSettingsManager.BUFFER_SIZE_OPTIONS
-                            .find { it.first == currentBufferSize }?.second ?: "Auto"
+                            .find { it.first == currentBufferSize }?.second ?: stringResource(R.string.rack_buffer_auto)
                         Box {
                             var showBufferMenu by remember { mutableStateOf(false) }
                             Row(
@@ -484,7 +489,7 @@ fun RackScreen(
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
-                                    text = "Buffer:",
+                                    text = stringResource(R.string.rack_buffer),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -528,7 +533,7 @@ fun RackScreen(
                             ) {
                                 Icon(
                                     Icons.Default.MoreVert,
-                                    contentDescription = "More options",
+                                    contentDescription = stringResource(R.string.rack_more_options),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -537,7 +542,7 @@ fun RackScreen(
                                 onDismissRequest = { showOverflowMenu = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Settings") },
+                                    text = { Text(stringResource(R.string.rack_settings)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         onNavigateToSettings()
@@ -551,7 +556,7 @@ fun RackScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Recordings") },
+                                    text = { Text(stringResource(R.string.rack_recordings)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         onNavigateToRecordings()
@@ -565,7 +570,7 @@ fun RackScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("TONE3000") },
+                                    text = { Text(stringResource(R.string.rack_tone3000)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         onNavigateToTone3000(null, null, null, -1, null)
@@ -580,7 +585,7 @@ fun RackScreen(
                                 )
                                 if (com.varcain.guitarrackcraft.BuildConfig.HAS_VST_HOST) {
                                     DropdownMenuItem(
-                                        text = { Text("Manage VST") },
+                                        text = { Text(stringResource(R.string.rack_manage_vst)) },
                                         onClick = {
                                             showOverflowMenu = false
                                             onNavigateToVstManager()
@@ -595,7 +600,7 @@ fun RackScreen(
                                     )
                                 }
                                 DropdownMenuItem(
-                                    text = { Text("About") },
+                                    text = { Text(stringResource(R.string.rack_about)) },
                                     onClick = {
                                         showOverflowMenu = false
                                         showAboutDialog = true
@@ -816,9 +821,9 @@ fun RackScreen(
             Spacer(modifier = Modifier.height(16.dp))
             if (!isEngineRunning) {
                 val bannerText = buildAnnotatedString {
-                    append("Engine not running, tap ")
+                    append(stringResource(R.string.rack_engine_banner_pre))
                     appendInlineContent("playIcon", "[>]")
-                    append(" Play to start the engine")
+                    append(stringResource(R.string.rack_engine_banner_post))
                 }
                 val bannerInlineContent = mapOf(
                     "playIcon" to InlineTextContent(
@@ -871,7 +876,7 @@ fun RackScreen(
                         IconButton(onClick = { viewModel.clearError() }) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = "Dismiss",
+                                contentDescription = stringResource(R.string.rack_dismiss),
                                 tint = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
@@ -1034,11 +1039,11 @@ private fun EmptyRackPlaceholder(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "No plugins in rack",
+                text = stringResource(R.string.rack_no_plugins),
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Tap + to add plugins",
+                text = stringResource(R.string.rack_add_plugins_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1226,7 +1231,7 @@ fun PluginCard(
                             onClick = { showContextMenu = true },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Options", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.rack_options), modifier = Modifier.size(20.dp))
                         }
                         DropdownMenu(
                             expanded = showContextMenu,
@@ -1305,7 +1310,7 @@ fun PluginCard(
                     ) {
                         Icon(
                             if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            contentDescription = if (expanded) stringResource(R.string.rack_collapse) else stringResource(R.string.rack_expand),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1350,7 +1355,7 @@ fun PluginCard(
                         ) {
                             Icon(
                                 Icons.Default.Fullscreen,
-                                contentDescription = "Fullscreen",
+                                contentDescription = stringResource(R.string.rack_fullscreen),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1367,7 +1372,7 @@ fun PluginCard(
                         ) {
                             Icon(
                                 Icons.Default.Keyboard,
-                                contentDescription = "Keyboard",
+                                contentDescription = stringResource(R.string.rack_keyboard),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -1379,7 +1384,7 @@ fun PluginCard(
                     ) {
                         Icon(
                             Icons.Default.SwapHoriz,
-                            contentDescription = "Replace",
+                            contentDescription = stringResource(R.string.rack_replace),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1390,7 +1395,7 @@ fun PluginCard(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Remove",
+                            contentDescription = stringResource(R.string.rack_remove),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1608,7 +1613,7 @@ fun PluginCard(
                 if (showVstWineFilePicker && vstWineFileRequestPending != null) {
                     val request = vstWineFileRequestPending!!
                     GenericFilePickerDialog(
-                        title = request.config.title,
+                        title = stringResource(request.config.titleRes),
                         storageDirs = request.config.storageDirs,
                         extensions = request.config.extensions,
                         builtInItems = request.config.builtInItems,
@@ -1727,7 +1732,7 @@ fun PluginCard(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Exit fullscreen",
+                                contentDescription = stringResource(R.string.rack_exit_fullscreen),
                                 tint = Color.White
                             )
                         }
@@ -1813,7 +1818,7 @@ fun PluginCard(
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "Exit fullscreen",
+                                        contentDescription = stringResource(R.string.rack_exit_fullscreen),
                                         tint = Color.White
                                     )
                                 }
@@ -1826,7 +1831,7 @@ fun PluginCard(
                                 ) {
                                     Icon(
                                         Icons.Default.Keyboard,
-                                        contentDescription = "Toggle keyboard",
+                                        contentDescription = stringResource(R.string.rack_toggle_keyboard),
                                         tint = Color.White
                                     )
                                 }
@@ -1932,7 +1937,7 @@ fun PluginCard(
                             ) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Exit fullscreen",
+                                    contentDescription = stringResource(R.string.rack_exit_fullscreen),
                                     tint = Color.White
                                 )
                             }
@@ -1995,7 +2000,7 @@ fun PluginCard(
                                 }
                             ) {
                                 OutlinedTextField(
-                                    value = modelActiveModelName ?: modelConfig.placeholder,
+                                    value = modelActiveModelName ?: stringResource(modelConfig.kind.placeholderRes()),
                                     onValueChange = {},
                                     readOnly = true,
                                     modifier = Modifier
@@ -2050,7 +2055,7 @@ fun PluginCard(
                             }
                         } else if (modelConfig == null && !isVst) {
                             Text(
-                                text = "No control parameters available",
+                                text = stringResource(R.string.rack_no_control_params),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2172,40 +2177,48 @@ fun ParameterControl(
     }
 }
 
+private enum class ModelKind { NAM, AIDA_X, IR }
+
 private data class ModelPluginConfig(
     val propertyUri: String,
     val extensions: Set<String>,
     val storageDirs: List<String>,
-    val placeholder: String,
+    val kind: ModelKind,
     val builtInItems: List<Pair<String, String>> = emptyList()
 )
+
+private fun ModelKind.placeholderRes(): Int = when (this) {
+    ModelKind.NAM -> R.string.model_picker_no_model
+    ModelKind.AIDA_X -> R.string.model_picker_no_model
+    ModelKind.IR -> R.string.model_picker_no_ir
+}
 
 private fun getModelPluginConfig(pluginId: String): ModelPluginConfig? = when {
     pluginId.contains("neural-amp-modeler") || pluginId.contains("neuralrack", ignoreCase = true) -> ModelPluginConfig(
         propertyUri = if (pluginId.contains("neural-amp-modeler")) "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model" else "urn:brummer:neuralrack#Neural_Model",
         extensions = setOf("nam", "nammodel", "json"),
         storageDirs = listOf("neural_models", "aidax_models"),
-        placeholder = "No model loaded",
+        kind = ModelKind.NAM,
         builtInItems = if (pluginId.contains("neural-amp-modeler")) listOf("Default: NAM Profile" to "default") else emptyList()
     )
     pluginId.contains("aidadsp") -> ModelPluginConfig(
         propertyUri = "http://aidadsp.cc/plugins/aidadsp-bundle/rt-neural-generic#json",
         extensions = setOf("json", "aidax", "aidadspmodel"),
         storageDirs = listOf("aidax_models"),
-        placeholder = "No model loaded",
+        kind = ModelKind.AIDA_X,
         builtInItems = listOf("Default: California Clean" to "default")
     )
     pluginId.contains("ImpulseLoader") -> ModelPluginConfig(
         propertyUri = "urn:brummer:ImpulseLoader#irfile",
         extensions = setOf("wav"),
         storageDirs = listOf("ir_models"),
-        placeholder = "No IR loaded"
+        kind = ModelKind.IR
     )
     else -> null
 }
 
 private data class X11FilePickerConfig(
-    val title: String,
+    val titleRes: Int,
     val storageDirs: List<String>,
     val extensions: Set<String>,
     val builtInItems: List<Pair<String, String>> // displayName to deliveryValue
@@ -2230,25 +2243,25 @@ private data class VstWineFilePickerRequest(
 
 private fun getX11FilePickerConfig(propertyUri: String): X11FilePickerConfig = when {
     propertyUri.endsWith("#json") || propertyUri.contains("rt-neural-generic#json") -> X11FilePickerConfig(
-        title = "Select AIDA-X Model",
+        titleRes = R.string.model_picker_title_aida_x,
         storageDirs = listOf("aidax_models"),
         extensions = setOf("json", "aidax", "aidadspmodel"),
         builtInItems = listOf("Default: California Clean" to "default")
     )
     propertyUri.endsWith("#cabinet") || propertyUri.contains("irfile") -> X11FilePickerConfig(
-        title = "Select Impulse Response",
+        titleRes = R.string.model_picker_title_ir,
         storageDirs = listOf("ir_models"),
         extensions = setOf("wav"),
         builtInItems = if (propertyUri.endsWith("#cabinet")) listOf("Default: V30 Audix i5" to "default") else emptyList()
     )
     propertyUri.contains("neural-amp-modeler") || propertyUri.contains("neuralrack#Neural_Model") -> X11FilePickerConfig(
-        title = "Select Neural Model",
+        titleRes = R.string.model_picker_title_neural,
         storageDirs = listOf("neural_models", "aidax_models"),
         extensions = setOf("nam", "nammodel", "json"),
         builtInItems = if (propertyUri.contains("neural-amp-modeler")) listOf("Default: NAM Profile" to "default") else emptyList()
     )
     else -> X11FilePickerConfig(
-        title = "Select File",
+        titleRes = R.string.model_picker_title_file,
         storageDirs = listOf("aidax_models"),
         extensions = emptySet(),
         builtInItems = emptyList()
@@ -2272,13 +2285,13 @@ private fun getVstWineFilePickerConfig(
 
     return when {
         isIr -> VstWinePickerKind.IR to X11FilePickerConfig(
-            title = "Select Impulse Response",
+            titleRes = R.string.model_picker_title_ir,
             storageDirs = listOf("ir_models"),
             extensions = setOf("wav"),
             builtInItems = emptyList()
         )
         isModel -> VstWinePickerKind.MODEL to X11FilePickerConfig(
-            title = "Select Neural Model",
+            titleRes = R.string.model_picker_title_neural,
             storageDirs = listOf("neural_models", "aidax_models"),
             extensions = setOf("nam", "nammodel", "json"),
             builtInItems = emptyList()
@@ -2349,7 +2362,7 @@ private fun GenericFilePickerDialog(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Icon(Icons.Default.Folder, contentDescription = null)
-                            Text("Browse files\u2026", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.rack_browse_files), fontWeight = FontWeight.Bold)
                         }
                         if (showTone3000) {
                             Row(
@@ -2366,7 +2379,7 @@ private fun GenericFilePickerDialog(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Text("Browse TONE3000", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text(stringResource(R.string.rack_browse_tone3000), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -2379,7 +2392,7 @@ private fun GenericFilePickerDialog(
                     item { Divider() }
                     item {
                         Text(
-                            "Favorites",
+                            stringResource(R.string.rack_favorites),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -2410,7 +2423,7 @@ private fun GenericFilePickerDialog(
                 if (builtInItems.isNotEmpty()) {
                     item {
                         Text(
-                            "Built-in",
+                            stringResource(R.string.rack_builtin),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -2434,7 +2447,7 @@ private fun GenericFilePickerDialog(
                 if (nonFavoriteFiles.isNotEmpty()) {
                     item {
                         Text(
-                            "On device",
+                            stringResource(R.string.rack_on_device),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -2504,7 +2517,7 @@ private fun GenericFilePickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }
@@ -2567,7 +2580,7 @@ private fun FileItemRow(
         ) {
             Icon(
                 if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "Favorite",
+                contentDescription = stringResource(R.string.rack_favorite),
                 tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
@@ -2584,7 +2597,7 @@ private fun FileItemRow(
             ) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete",
+                    contentDescription = stringResource(R.string.common_delete),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                     modifier = Modifier.size(18.dp)
                 )
@@ -2604,21 +2617,21 @@ private fun X11FilePickerDialog(
     onDismiss: () -> Unit
 ) {
     GenericFilePickerDialog(
-        title = config.title,
+        title = stringResource(config.titleRes),
         storageDirs = config.storageDirs,
         extensions = config.extensions,
         builtInItems = config.builtInItems,
         onFileSelected = onFileSelected,
         onBrowseFiles = onBrowseFiles,
         onNavigateToTone3000 = {
-            val initialPlatform = when {
-                config.title.contains("Neural Model") -> "nam"
-                config.title.contains("AIDA-X") -> "aida-x"
-                config.title.contains("Impulse Response") -> "ir"
+            val initialPlatform = when (config.titleRes) {
+                R.string.model_picker_title_neural -> "nam"
+                R.string.model_picker_title_aida_x -> "aida-x"
+                R.string.model_picker_title_ir -> "ir"
                 else -> null
             }
             val initialTag = if (initialPlatform == "aida-x") "aida-x" else null
-            val initialGear = if (config.title.contains("Impulse Response")) "ir" else null
+            val initialGear = if (config.titleRes == R.string.model_picker_title_ir) "ir" else null
             val sourceSlot = sourcePropertyUri.substringAfterLast('#', "").ifEmpty { null }
             onNavigateToTone3000(initialTag, initialGear, initialPlatform, sourcePluginIndex, sourceSlot)
         },
@@ -2726,7 +2739,7 @@ private fun copySafUriForVstWinePicker(
                 propertyUri = "",
                 extensions = request.config.extensions,
                 storageDirs = request.config.storageDirs,
-                placeholder = ""
+                kind = ModelKind.NAM
             )
         )
         models.firstOrNull() ?: throw IOException("No supported model files found in $fileName")
@@ -2885,7 +2898,7 @@ private fun ModelPicker(
 
     if (showDialog) {
         GenericFilePickerDialog(
-            title = "Select Model",
+            title = stringResource(R.string.model_picker_title_model),
             storageDirs = config.storageDirs,
             extensions = config.extensions,
             builtInItems = config.builtInItems,
@@ -2933,29 +2946,29 @@ private fun RackBottomBar(
         ) {
             BottomBarButton(
                 icon = Icons.Default.LibraryMusic,
-                label = "Presets",
+                label = stringResource(R.string.rack_presets),
                 onClick = onOpenPresets
             )
             BottomBarButton(
                 icon = Icons.Default.Add,
-                label = "Add",
+                label = stringResource(R.string.rack_add),
                 onClick = onAddPlugin,
                 testTag = "rack_add_plugin"
             )
             BottomBarButton(
                 icon = if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
-                label = if (isRecording) formatRecordingDuration(recordingDurationSec) else "Record",
+                label = if (isRecording) formatRecordingDuration(recordingDurationSec) else stringResource(R.string.rack_record),
                 onClick = onToggleRecording,
                 tint = if (isRecording) MaterialTheme.colorScheme.error else Color(0xFFE53935)
             )
             BottomBarButton(
                 icon = Icons.Default.MusicNote,
-                label = "Playback",
+                label = stringResource(R.string.rack_playback),
                 onClick = onOpenWav
             )
             BottomBarButton(
                 icon = if (isEngineRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                label = if (isEngineRunning) "Stop" else "Play",
+                label = if (isEngineRunning) stringResource(R.string.rack_stop) else stringResource(R.string.rack_play),
                 onClick = onToggleEngine,
                 tint = if (isEngineRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 testTag = "rack_engine_fab"
@@ -3018,7 +3031,7 @@ private fun WavLoadDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Playback") },
+        title = { Text(stringResource(R.string.rack_playback)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -3033,7 +3046,7 @@ private fun WavLoadDialog(
                     ) {
                         Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Load WAV", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.rack_load_wav), style = MaterialTheme.typography.labelMedium)
                     }
                     OutlinedButton(
                         onClick = onLoadRecordings,
@@ -3043,7 +3056,7 @@ private fun WavLoadDialog(
                     ) {
                         Icon(Icons.Default.Album, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Recordings", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.rack_recordings), style = MaterialTheme.typography.labelMedium)
                     }
                 }
 
@@ -3057,7 +3070,7 @@ private fun WavLoadDialog(
                         onCheckedChange = { onToggleProcessEffects() }
                     )
                     Text(
-                        text = "Process through effects",
+                        text = stringResource(R.string.rack_process_through_effects),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -3110,7 +3123,7 @@ private fun WavLoadDialog(
                         IconButton(onClick = onToggleRepeat, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 Icons.Default.Repeat,
-                                contentDescription = if (repeat) "Repeat on" else "Repeat off",
+                                contentDescription = if (repeat) stringResource(R.string.rack_repeat_on) else stringResource(R.string.rack_repeat_off),
                                 tint = if (repeat) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
@@ -3120,7 +3133,7 @@ private fun WavLoadDialog(
                         IconButton(onClick = onRestart, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 Icons.Default.SkipPrevious,
-                                contentDescription = "Restart",
+                                contentDescription = stringResource(R.string.rack_restart),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -3128,7 +3141,7 @@ private fun WavLoadDialog(
                         IconButton(onClick = onPlayPause, modifier = Modifier.size(44.dp)) {
                             Icon(
                                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                contentDescription = if (isPlaying) stringResource(R.string.rack_pause) else stringResource(R.string.rack_play),
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -3136,7 +3149,7 @@ private fun WavLoadDialog(
                         IconButton(onClick = onStop, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 Icons.Default.StopCircle,
-                                contentDescription = "Stop",
+                                contentDescription = stringResource(R.string.rack_stop),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -3147,12 +3160,12 @@ private fun WavLoadDialog(
                     TextButton(onClick = onClose) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Unload")
+                        Text(stringResource(R.string.rack_unload))
                     }
                 } else if (!isEngineRunning) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Start the engine to load a WAV file",
+                        text = stringResource(R.string.rack_engine_needed_for_wav),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -3161,7 +3174,7 @@ private fun WavLoadDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         }
     )
 }
@@ -3205,7 +3218,7 @@ private fun WavPlaybackBar(
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -3245,7 +3258,7 @@ private fun WavPlaybackBar(
                 IconButton(onClick = onToggleRepeat, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.Repeat,
-                        contentDescription = if (repeat) "Repeat on" else "Repeat off",
+                        contentDescription = if (repeat) stringResource(R.string.rack_repeat_on) else stringResource(R.string.rack_repeat_off),
                         tint = if (repeat) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -3255,7 +3268,7 @@ private fun WavPlaybackBar(
                 IconButton(onClick = onRestart, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.SkipPrevious,
-                        contentDescription = "Restart",
+                        contentDescription = stringResource(R.string.rack_restart),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -3263,7 +3276,7 @@ private fun WavPlaybackBar(
                 IconButton(onClick = onPlayPause, modifier = Modifier.size(44.dp)) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) stringResource(R.string.rack_pause) else stringResource(R.string.rack_play),
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -3271,7 +3284,7 @@ private fun WavPlaybackBar(
                 IconButton(onClick = onStop, modifier = Modifier.size(36.dp)) {
                     Icon(
                         Icons.Default.StopCircle,
-                        contentDescription = "Stop",
+                        contentDescription = stringResource(R.string.rack_stop),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -3299,6 +3312,7 @@ private fun PresetBottomSheet(
     var showSaveDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        val sharePresetLabel = stringResource(R.string.rack_share_preset)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3313,11 +3327,11 @@ private fun PresetBottomSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Recently Used", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.rack_recently_used), style = MaterialTheme.typography.titleSmall)
                     TextButton(onClick = {
                         viewModel.clearRecentPresets(context)
                     }) {
-                        Text("Clear")
+                        Text(stringResource(R.string.rack_clear))
                     }
                 }
                 recentPresets.forEach { name ->
@@ -3335,7 +3349,7 @@ private fun PresetBottomSheet(
                                     putExtra(Intent.EXTRA_TEXT, json)
                                     putExtra(Intent.EXTRA_SUBJECT, "$name.json")
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Share preset"))
+                                context.startActivity(Intent.createChooser(intent, sharePresetLabel))
                             }
                         },
                         showDelete = false
@@ -3345,10 +3359,10 @@ private fun PresetBottomSheet(
             }
 
             // All presets section
-            Text("All Presets", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.rack_all_presets), style = MaterialTheme.typography.titleSmall)
             if (presetList.isEmpty()) {
                 Text(
-                    "No saved presets",
+                    stringResource(R.string.rack_no_saved_presets),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 12.dp)
@@ -3369,7 +3383,7 @@ private fun PresetBottomSheet(
                                     putExtra(Intent.EXTRA_TEXT, json)
                                     putExtra(Intent.EXTRA_SUBJECT, "$name.json")
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Share preset"))
+                                context.startActivity(Intent.createChooser(intent, sharePresetLabel))
                             }
                         },
                         onDelete = {
@@ -3385,7 +3399,7 @@ private fun PresetBottomSheet(
                 onClick = { showSaveDialog = true },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save Current Preset")
+                Text(stringResource(R.string.rack_save_current_preset))
             }
         }
     }
@@ -3423,11 +3437,11 @@ private fun PresetListItem(
             modifier = Modifier.weight(1f)
         )
         IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share), modifier = Modifier.size(18.dp))
         }
         if (showDelete && onDelete != null) {
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.common_delete), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -3444,19 +3458,19 @@ private fun PresetSaveDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Save Preset") },
+        title = { Text(stringResource(R.string.rack_save_preset)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Preset name") },
+                    label = { Text(stringResource(R.string.rack_preset_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (nameExists) {
                     Text(
-                        text = "A preset with this name exists and will be overwritten",
+                        text = stringResource(R.string.rack_preset_overwrite_warn),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp)
@@ -3469,11 +3483,11 @@ private fun PresetSaveDialog(
                 onClick = { onSave(name.trim()) },
                 enabled = name.isNotBlank()
             ) {
-                Text(if (nameExists) "Overwrite" else "Save")
+                Text(if (nameExists) stringResource(R.string.rack_overwrite) else stringResource(R.string.rack_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }
@@ -3488,11 +3502,11 @@ private fun RecordingPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Recording") },
+        title = { Text(stringResource(R.string.rack_select_recording)) },
         text = {
             if (recordings.isEmpty()) {
                 Text(
-                    "No recordings available.",
+                    stringResource(R.string.rack_no_recordings),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -3521,14 +3535,14 @@ private fun RecordingPickerDialog(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("Raw", style = MaterialTheme.typography.labelSmall)
+                                        Text(stringResource(R.string.rack_raw), style = MaterialTheme.typography.labelSmall)
                                     }
                                     OutlinedButton(
                                         onClick = { onPickRecording(entry.processedFile.absolutePath, false) },
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("Processed", style = MaterialTheme.typography.labelSmall)
+                                        Text(stringResource(R.string.rack_processed), style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -3539,7 +3553,7 @@ private fun RecordingPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         }
     )
 }
@@ -3554,7 +3568,7 @@ fun AboutDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("About") },
+        title = { Text(stringResource(R.string.rack_about)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -3566,7 +3580,7 @@ fun AboutDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Build: ${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} · ${BuildConfig.BUILD_HOST}",
+                    text = stringResource(R.string.about_build, BuildConfig.BUILD_DATE, BuildConfig.BUILD_TIME, BuildConfig.BUILD_HOST),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -3575,14 +3589,14 @@ fun AboutDialog(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = "This app is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License (GPL).",
+                    text = stringResource(R.string.about_license),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("OK") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_ok)) }
         }
     )
 }

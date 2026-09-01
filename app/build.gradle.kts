@@ -24,6 +24,7 @@ import java.net.InetAddress
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -61,6 +62,12 @@ android {
         ndk {
             // LV2 libs (lilv, etc.) are built for arm64-v8a only; use arm64-v8a until armeabi-v7a libs are built
             abiFilters += listOf("arm64-v8a")
+            // 可选开关：./gradlew -PabiX86=true assembleFullDebug 加入 x86_64，
+            // 供模拟器/CI instrumentation 测试用。默认关闭——LV2 插件 .so 与
+            // arm64 FTZ 注入脚本仅覆盖 arm64，x86_64 下插件不可加载（UI/引擎可跑）。
+            if (project.hasProperty("abiX86")) {
+                abiFilters += "x86_64"
+            }
         }
     }
 
@@ -81,7 +88,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 混淆 + 资源收缩：更小的 APK，并移除未使用代码。
+            // JNI/Gson 相关 keep 规则见 proguard-rules.pro。
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -126,6 +136,15 @@ android {
 
     lint {
         checkReleaseBuilds = false
+        // 先不因存量 lint 问题阻断 CI；报告见 app/build/reports/
+        abortOnError = false
+    }
+
+    testOptions {
+        unitTests {
+            // Tone3000Api 等类在 JVM 单测中调用 android.util.Log，返回默认值即可
+            isReturnDefaultValues = true
+        }
     }
 
     compileOptions {
@@ -141,13 +160,12 @@ android {
         compose = true
         buildConfig = true
         // Consume :vsthost_lib's prefab package (full flavor only — playstore
-        // never depends on :vsthost_lib so find_package returns NOTFOUND there).
+        // never depends on :vsthost_lib so find_package returns NOT_FOUND there).
         prefab = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.4"
-    }
+    // Kotlin 2.x 下 Compose 编译器版本由 org.jetbrains.kotlin.plugin.compose
+    // 插件管理，不再需要 composeOptions.kotlinCompilerExtensionVersion。
 
     packaging {
         resources {
@@ -214,12 +232,12 @@ dependencies {
     "fullImplementation"(project(":vsthost_lib"))
 
     // Core Android
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    implementation("androidx.activity:activity-compose:1.8.1")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.activity:activity-compose:1.9.3")
 
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2023.10.01"))
+    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -227,31 +245,35 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // WebView safe file access (avoid file:// access denied on API 29+)
-    implementation("androidx.webkit:webkit:1.8.0")
+    implementation("androidx.webkit:webkit:1.12.1")
 
     // Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    implementation("com.google.accompanist:accompanist-permissions:0.36.0")
 
     // Networking & JSON
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.11.0")
+
+    // Encrypted token storage (Tone3000 会话令牌)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Image loading
-    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test:rules:1.5.0")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.10.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

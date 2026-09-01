@@ -28,22 +28,29 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class ApiException(val code: Int, val errorBody: String?) : Exception("API Error $code: $errorBody")
 
-class Tone3000Api(private val tokenManager: TokenManager) {
+class Tone3000Api(
+    private val tokenManager: TokenStore,
+    private val baseUrl: String = "https://www.tone3000.com/api/v1"
+) {
     private val gson = Gson()
-    private val baseUrl = "https://www.tone3000.com/api/v1"
     private val tag = "Tone3000Api"
     private val userAgent = "GuitarRackCraft/${BuildConfig.VERSION_NAME}"
     private val appId = "GuitarRackCraft"
 
     private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(120, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val requestBuilder = chain.request().newBuilder()
             requestBuilder.header("User-Agent", userAgent)
             requestBuilder.header("X-App-Id", appId)
-            
+
             tokenManager.accessToken?.let { token ->
                 if (token.isNotEmpty()) {
                     requestBuilder.header("Authorization", "Bearer $token")
@@ -89,6 +96,17 @@ class Tone3000Api(private val tokenManager: TokenManager) {
         })
         .build()
 
+    /** 无鉴权客户端：与主 client 共享连接池/线程池，但不附加
+     *  Authorization 头和 401 刷新逻辑（用于登录与刷新本身）。 */
+    private val bareClient: OkHttpClient = client.newBuilder()
+        .apply {
+            interceptors().clear()
+            // OkHttp Kotlin 化后 authenticator(=null) 不再接受 null；
+            // 用无操作的 authenticator 达到同样效果（永不触发重试）。
+            authenticator { _, _ -> null }
+        }
+        .build()
+
     private fun Response.count401(): Int {
         var result = 1
         var r = priorResponse
@@ -111,10 +129,10 @@ class Tone3000Api(private val tokenManager: TokenManager) {
             .build()
 
         return try {
-            OkHttpClient().newCall(request).execute().use { response ->
+            bareClient.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string()
                 if (!response.isSuccessful) {
-                    Log.e(tag, "exchangeApiKey failed: ${response.code} - $responseBody")
+                    Log.e(tag, "exchangeApiKey failed: ${response.code}")
                     throw ApiException(response.code, responseBody)
                 }
                 gson.fromJson(responseBody, Session::class.java)
@@ -138,10 +156,10 @@ class Tone3000Api(private val tokenManager: TokenManager) {
             .build()
 
         return try {
-            OkHttpClient().newCall(request).execute().use { response ->
+            bareClient.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string()
                 if (!response.isSuccessful) {
-                    Log.e(tag, "refreshSession failed: ${response.code} - $responseBody")
+                    Log.e(tag, "refreshSession failed: ${response.code}")
                     throw ApiException(response.code, responseBody)
                 }
                 gson.fromJson(responseBody, Session::class.java)
@@ -203,9 +221,10 @@ class Tone3000Api(private val tokenManager: TokenManager) {
         return try {
             client.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string()
-                Log.d(tag, "searchTones response: $responseBody")
+                // 完整响应体可能携带会话相关信息，仅在 debug 构建输出
+                if (BuildConfig.DEBUG) Log.d(tag, "searchTones response: $responseBody")
                 if (!response.isSuccessful) {
-                    Log.e(tag, "searchTones failed: ${response.code} - $responseBody")
+                    Log.e(tag, "searchTones failed: ${response.code}")
                     throw ApiException(response.code, responseBody)
                 }
                 try {
@@ -226,6 +245,27 @@ class Tone3000Api(private val tokenManager: TokenManager) {
 
     @Throws(ApiException::class, IOException::class)
     fun getModels(toneId: String, pageSize: Int = 10, architecture: String? = null): List<Model>? {
+        // 未指定架构时，服务器默认只返回 A1（legacy）模型；
+        // 主动请求 A2/A1/custom 并合并，让用户能看到全部可用模型（A2 优先）。
+        if (architecture == null) {
+            val merged = mutableListOf<Model>()
+            for (arch in listOf("2", "1", "custom")) {
+                try {
+                    val batch = fetchModelsPageAll(toneId, pageSize, arch) ?: continue
+                    merged.addAll(batch)
+                } catch (e: Exception) {
+                    // 单个架构请求失败不应阻断其他架构，记录日志后继续
+                    Log.w(tag, "getModels: architecture=$arch fetch failed: ${e.message}")
+                }
+            }
+            return merged.distinctBy { it.id }.ifEmpty { null }
+        }
+        return fetchModelsPageAll(toneId, pageSize, architecture)
+    }
+
+    /** 拉取指定架构下某音色的全部分页模型。 */
+    @Throws(ApiException::class, IOException::class)
+    private fun fetchModelsPageAll(toneId: String, pageSize: Int, architecture: String): List<Model>? {
         val allModels = mutableListOf<Model>()
         var currentPage = 1
         var totalPages = 1
@@ -235,11 +275,11 @@ class Tone3000Api(private val tokenManager: TokenManager) {
             urlBuilder.addQueryParameter("tone_id", toneId)
             urlBuilder.addQueryParameter("page", currentPage.toString())
             urlBuilder.addQueryParameter("page_size", pageSize.toString())
-            if (!architecture.isNullOrEmpty()) {
+            if (architecture.isNotEmpty()) {
                 urlBuilder.addQueryParameter("architecture", architecture)
             }
             val request = Request.Builder().url(urlBuilder.build()).build()
-            
+
             try {
                 client.newCall(request).execute().use { response ->
                     val responseBody = response.body?.string()
@@ -306,23 +346,68 @@ class Tone3000Api(private val tokenManager: TokenManager) {
             .filter { it.isNotBlank() }
             .joinToString("-") { if (it == "full-rig") "amp-cab" else it }
 
-    fun downloadFile(url: String, destFile: java.io.File): Boolean {
+    /**
+     * 下载文件到 [destFile]。
+     *
+     * @param onProgress 进度回调（已读字节数, 总字节数；总长未知时为 -1），
+     *  在 IO 线程回调，节流为最多每 256KB 或每 1% 触发一次。
+     */
+    fun downloadFile(
+        url: String,
+        destFile: java.io.File,
+        onProgress: ((Long, Long) -> Unit)? = null
+    ): Boolean {
         val request = Request.Builder().url(url).build()
+        // 先写临时文件再原子重命名，避免中断后留下损坏的半截文件
+        val tmpFile = java.io.File(destFile.parentFile, destFile.name + ".part")
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     Log.e(tag, "downloadFile failed: ${response.code}")
                     return false
                 }
-                response.body?.byteStream()?.use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
+                val total = response.body?.contentLength() ?: -1L
+                val body = response.body ?: return false
+                // 注意：不要把 use{} 结果接到 ?: 上——内部块以可空调用结尾时会
+                // 整体返回 null 误触发 return false。use 作为独立语句使用。
+                body.byteStream().use { input ->
+                    tmpFile.outputStream().use { output ->
+                        val buf = ByteArray(64 * 1024)
+                        var read: Int
+                        var done = 0L
+                        var lastReported = -1L
+                        while (input.read(buf).also { read = it } != -1) {
+                            output.write(buf, 0, read)
+                            done += read
+                            if (onProgress != null) {
+                                // 节流：每 256KB 或总进度每变化 1% 上报一次
+                                val step = if (total > 0) total / 100 else 256 * 1024
+                                val threshold = maxOf(step, 64 * 1024L)
+                                if (done - lastReported >= threshold) {
+                                    onProgress(done, total)
+                                    lastReported = done
+                                }
+                            }
+                        }
+                        onProgress?.invoke(done, total)
                     }
                 }
+            }
+            if (tmpFile.exists() && tmpFile.length() > 0) {
+                if (destFile.exists()) destFile.delete()
+                if (!tmpFile.renameTo(destFile)) {
+                    // 跨文件系统重命名失败时退回复制
+                    tmpFile.copyTo(destFile, overwrite = true)
+                    tmpFile.delete()
+                }
                 true
+            } else {
+                tmpFile.delete()
+                false
             }
         } catch (e: Exception) {
             Log.e(tag, "downloadFile exception", e)
+            tmpFile.delete()
             false
         }
     }

@@ -20,9 +20,10 @@
 package com.varcain.guitarrackcraft
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -42,6 +43,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.varcain.guitarrackcraft.engine.AudioEngine
 import com.varcain.guitarrackcraft.engine.EngineInitHelper
+import com.varcain.guitarrackcraft.engine.PresetManager
 import com.varcain.guitarrackcraft.ui.loading.PluginExtractScreen
 import com.varcain.guitarrackcraft.ui.navigation.AppNavigation
 import com.varcain.guitarrackcraft.ui.theme.GuitarRackCraftTheme
@@ -52,7 +54,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
-import java.io.InputStream
 
 class MainActivity : ComponentActivity() {
 
@@ -60,7 +61,16 @@ class MainActivity : ComponentActivity() {
     private var extractedCount by mutableIntStateOf(0)
     private var extractTotalCount by mutableIntStateOf(0)
 
-    override fun onNewIntent(intent: android.content.Intent?) {
+    // 应用所选语言（跟随系统/英文/中文）：包装 context 使资源解析使用目标语言
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.varcain.guitarrackcraft.engine.LanguageManager.wrapContext(newBase))
+    }
+
+    companion object {
+        private const val KEY_LV2_ASSETS_STAMP = "lv2_assets_stamp"
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         handleAuthIntent(intent)
     }
@@ -92,6 +102,12 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         android.util.Log.d("MainActivity", "RECORD_AUDIO permission result: granted=$granted")
+    }
+
+    private val requestNotifPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        android.util.Log.d("MainActivity", "POST_NOTIFICATIONS permission result: granted=$granted")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -143,6 +159,19 @@ class MainActivity : ComponentActivity() {
         val lv2Dir = File(applicationContext.filesDir, "lv2")
         lv2Dir.mkdirs()
 
+        // 增量提取：APK 未更新且目标目录非空时直接跳过，省去每次冷启动
+        // 逐文件覆盖复制上百个资产的数秒 IO。
+        val prefs = getSharedPreferences("engine_prefs", Context.MODE_PRIVATE)
+        val installStamp = try {
+            packageManager.getPackageInfo(packageName, 0).lastUpdateTime
+        } catch (_: Exception) { 0L }
+        val stamp = "${BuildConfig.VERSION_CODE}-$installStamp"
+        if (prefs.getString(KEY_LV2_ASSETS_STAMP, null) == stamp
+            && !lv2Dir.list().isNullOrEmpty()) {
+            android.util.Log.d("MainActivity", "LV2 assets up to date (stamp=$stamp), skipping extraction")
+            return
+        }
+
         try {
             // Primary: use build-time file manifest for reliable extraction.
             // assets.list() is unreliable across split APKs on some Android versions,
@@ -181,6 +210,10 @@ class MainActivity : ComponentActivity() {
             }
             val bundleCount = lv2Dir.list()?.size ?: 0
             android.util.Log.d("MainActivity", "LV2 assets extracted to ${lv2Dir.absolutePath} ($bundleCount top-level entries)")
+            if (bundleCount > 0) {
+                // 提取成功后才写入版本戳；失败下次启动会重试
+                prefs.edit().putString(KEY_LV2_ASSETS_STAMP, stamp).apply()
+            }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to extract LV2 assets", e)
         }
@@ -202,30 +235,28 @@ class MainActivity : ComponentActivity() {
             } else {
                 // list() returned null or empty - try to open as file
                 try {
-                    val inputStream: InputStream = assets.open(assetPath)
-                    val fileName = assetPath.substringAfterLast('/')
+                    assets.open(assetPath).use { inputStream ->
+                        val fileName = assetPath.substringAfterLast('/')
 
-                    // Skip .so files — plugin binaries are loaded from nativeLibDir
-                    if (fileName.endsWith(".so")) {
-                        inputStream.close()
-                        return
-                    }
-                    val outputFile = File(outputDir.parentFile ?: outputDir, fileName)
-                    
-                    // Remove existing file/directory if it exists
-                    if (outputFile.exists()) {
-                        if (outputFile.isDirectory) {
-                            outputFile.deleteRecursively()
-                        } else {
-                            outputFile.delete()
+                        // Skip .so files — plugin binaries are loaded from nativeLibDir
+                        if (fileName.endsWith(".so")) return
+
+                        val outputFile = File(outputDir.parentFile ?: outputDir, fileName)
+
+                        // Remove existing file/directory if it exists
+                        if (outputFile.exists()) {
+                            if (outputFile.isDirectory) {
+                                outputFile.deleteRecursively()
+                            } else {
+                                outputFile.delete()
+                            }
+                        }
+
+                        outputFile.parentFile?.mkdirs()
+                        FileOutputStream(outputFile).use { output ->
+                            inputStream.copyTo(output)
                         }
                     }
-                    
-                    outputFile.parentFile?.mkdirs()
-                    FileOutputStream(outputFile).use { output ->
-                        inputStream.copyTo(output)
-                    }
-                    inputStream.close()
                 } catch (e: FileNotFoundException) {
                     // Asset might not exist, skip
                     android.util.Log.d("MainActivity", "Asset not found as file: $assetPath")
@@ -257,8 +288,16 @@ class MainActivity : ComponentActivity() {
             val logPath = File(cacheDir, "ahbspike.log").absolutePath
             withContext(Dispatchers.IO) {
                 android.util.Log.i("AhbSpike", "running spike (hook=${applicationInfo.nativeLibraryDir} turnip=$turnipDir log=$logPath)")
-                val ok = com.varcain.vsthost.NativeBridge.nativeAhbSpike(
-                    applicationInfo.nativeLibraryDir, turnipDir, "vulkan.ad07xx.so", logPath)
+                // 反射调用 full flavor 的 vsthost NativeBridge：main sourceSet 不能
+                // 硬引用该类，否则 playstore 变体（无 :vsthost_lib 依赖）编译失败。
+                // marker 文件门控，playstore 路径永远不会执行到这里。
+                val ok = Class.forName("com.varcain.vsthost.NativeBridge")
+                    .getMethod(
+                        "nativeAhbSpike",
+                        String::class.java, String::class.java,
+                        String::class.java, String::class.java
+                    )
+                    .invoke(null, applicationInfo.nativeLibraryDir, turnipDir, "vulkan.ad07xx.so", logPath) as Boolean
                 android.util.Log.i("AhbSpike", "spike returned ok=$ok")
             }
         } catch (e: Throwable) {
@@ -313,6 +352,10 @@ class MainActivity : ComponentActivity() {
     private fun prepareLv2AndInitEngine() {
         EngineInitHelper.preloadLilv(applicationInfo.nativeLibraryDir)
         extractLV2Assets()
+        // 首次启动导入内置名曲预设（只导入一次，不覆盖用户已有文件）
+        PresetManager.importBundledPresets(applicationContext)
+        // 首次启动导入内置 NAM 模型（预设中的 NAM 插件需要从 filesDir 加载）
+        PresetManager.importBundledNeuralModels(applicationContext)
         EngineInitHelper.initEngine(this) { extracted, total ->
             extractedCount = extracted
             extractTotalCount = total
@@ -324,6 +367,11 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             android.util.Log.d("MainActivity", "RECORD_AUDIO not granted, requesting...")
             requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+        // Android 13+：前台服务通知需要运行时授权
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestNotifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -346,6 +394,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing()) {
             android.util.Log.i("AudioLifecycle", "MainActivity.onDestroy (finishing) -> stopEngine()")
             AudioEngine.stop()
+            com.varcain.guitarrackcraft.engine.AudioForegroundService.stop(this)
         }
     }
 }

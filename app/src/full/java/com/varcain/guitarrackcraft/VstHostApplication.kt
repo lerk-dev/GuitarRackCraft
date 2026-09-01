@@ -75,9 +75,13 @@ class VstHostApplication : Application() {
     }
 
     private fun currentProcessName(): String? = try {
-        // API 28+ has Application.getProcessName(); we're guaranteed 28+ on
-        // full flavor (targetSdk=28) so this is safe.
-        android.app.Application.getProcessName()
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            android.app.Application.getProcessName()
+        } else {
+            // minSdk=26：targetSdk 不代表设备版本，API 26/27 上
+            // getProcessName() 不存在，回退到 /proc
+            java.io.File("/proc/self/cmdline").readText().trimEnd('\u0000')
+        }
     } catch (t: Throwable) {
         Log.w(TAG, "getProcessName failed: $t")
         null

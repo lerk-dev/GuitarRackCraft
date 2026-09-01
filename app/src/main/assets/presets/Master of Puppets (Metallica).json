@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "presetName": "Master of Puppets (Metallica)",
+  "timestamp": 1787900001000,
+  "pluginUris": [
+    "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+    "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+    "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo"
+  ],
+  "plugins": [
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gxts9#ts9sim",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 0.25 },
+        { "index": 1, "value": 700.0 },
+        { "index": 2, "value": 0.7 }
+      ],
+      "stateProperties": []
+    },
+    {
+      "uri": "http://github.com/mikeoliphant/neural-amp-modeler-lv2",
+      "format": "LV2",
+      "controlPorts": [],
+      "stateProperties": [
+        {
+          "key": "http://github.com/mikeoliphant/neural-amp-modeler-lv2#model",
+          "type": "http://lv2plug.in/ns/ext/atom#Path",
+          "flags": 3,
+          "value": "neural_models/Helga_B_6505+_Red_ch_-_NoBoost.nam"
+        }
+      ]
+    },
+    {
+      "uri": "http://guitarix.sourceforge.net/plugins/gx_reverb_stereo#_reverb_stereo",
+      "format": "LV2",
+      "controlPorts": [
+        { "index": 0, "value": 15.0 },
+        { "index": 2, "value": 0.3 },
+        { "index": 3, "value": 0.5 },
+        { "index": 4, "value": 0.0 }
+      ],
+      "stateProperties": []
+    }
+  ]
+}

@@ -21,9 +21,11 @@
 #define GUITARRACKCRAFT_AUDIO_ENGINE_H
 
 #include <oboe/Oboe.h>
+#include <oboe/FullDuplexStream.h>
 #include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 #include "plugin/PluginChain.h"
@@ -34,8 +36,15 @@ namespace guitarrackcraft {
 /**
  * Audio engine using Oboe for low-latency audio I/O.
  * Processes audio through the plugin chain in real-time.
+ *
+ * Inherits oboe::FullDuplexStream so the input and output streams are
+ * synchronized inside the output data callback: the input is drained on
+ * startup and read only when data is actually available, so stale audio
+ * never piles up in the input buffer (a common cause of large, constant
+ * latency when using a USB audio interface).
  */
-class AudioEngine : public oboe::AudioStreamCallback {
+class AudioEngine : public oboe::FullDuplexStream,
+                    public oboe::AudioStreamErrorCallback {
 public:
     AudioEngine();
     ~AudioEngine();
@@ -50,8 +59,10 @@ public:
 
     /**
      * Stop audio processing.
+     * Overrides oboe::FullDuplexStream::stop() — same signature, different
+     * semantics: tears down recorder, plugin chain and both streams safely.
      */
-    void stop();
+    oboe::Result stop() override;
 
     /**
      * Check if engine is running.
@@ -116,6 +127,14 @@ public:
     int32_t getXRunCount() const;
 
     /**
+     * Audio session id of the output stream (AAudio). Used by the Kotlin layer
+     * to disable system post-processing effects (Dolby/MiSound) that OEM audio
+     * policies insert on music streams and that badly distort guitar audio.
+     * Returns 0 if the stream is not open or has no session.
+     */
+    int32_t getOutputSessionId() const;
+
+    /**
      * True if input has clipped (peak >= 0.99).
      */
     bool isInputClipping() const;
@@ -165,12 +184,16 @@ public:
     bool isWavPlaying() const;
     bool isWavLoaded() const;
 
-    // Oboe AudioStreamCallback implementation
-    oboe::DataCallbackResult onAudioReady(
-        oboe::AudioStream* audioStream,
-        void* audioData,
-        int32_t numFrames) override;
+    // FullDuplexStream callback (implemented): called from the output stream's
+    // data callback once both input and output data are available.
+    oboe::DataCallbackResult onBothStreamsReady(
+        const void* inputData,
+        int   numInputFrames,
+        void* outputData,
+        int   numOutputFrames
+        ) override;
 
+    // AudioStreamErrorCallback implementation
     void onErrorBeforeClose(oboe::AudioStream* oboeStream, oboe::Result error) override;
     void onErrorAfterClose(oboe::AudioStream* oboeStream, oboe::Result error) override;
 
@@ -234,6 +257,15 @@ private:
     size_t wavLengthFrames_{0};
 
     AudioRecorder recorder_;
+
+    // Adaptive latency tuner (Amp Rack / LatencyTuner approach): periodically
+    // retries shrinking the input buffer toward the burst size — some devices
+    // only accept it once the stream has been running for a while — and backs
+    // off by one burst when new xruns appear after a shrink.
+    std::thread latencyTunerThread_;
+    std::atomic<bool> latencyTunerRunning_{false};
+    std::atomic<int32_t> tunerXrunsAtShrink_{-1};
+    void latencyTunerLoop();
 
     bool createAudioStreams(float sampleRate);
     void closeStreams();

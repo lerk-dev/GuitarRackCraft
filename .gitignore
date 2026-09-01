@@ -110,6 +110,8 @@ lint/tmp/
 app/src/main/assets/*
 !app/src/main/assets/modgui_runtime.js
 !app/src/main/assets/lv2/
+!app/src/main/assets/presets/
+!app/src/main/assets/neural_models/
 app/src/main/cpp/libs/
 app/src/main/jniLibs/
 
@@ -138,3 +140,6 @@ vsthost_lib/external/fex-upstream/build-*/
 # ~8.5 GB; source fetched manually (llvm-project-18.1.3.src tarball), not committed.
 vsthost_lib/external/llvm-android/
 vsthost_lib/toolchain/
+
+# full-flavor build assets (rebuilt by build.sh)
+app/src/full/assets/
