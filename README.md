@@ -1,132 +1,283 @@
-# Guitar RackCraft
+# Guitar RackCraft（lerk-dev fork）
 
-[![CI](https://github.com/Varcain/GuitarRackCraft/actions/workflows/ci.yml/badge.svg)](https://github.com/Varcain/GuitarRackCraft/actions/workflows/ci.yml)
+> 本仓库是 [Varcain/GuitarRackCraft](https://github.com/Varcain/GuitarRackCraft) 的分支，增加了完整简体中文本地化、内置名曲预设（NAM 音色链）、音频引擎稳定性修复等改进，详见 [README_汉化与改进.md](README_汉化与改进.md)。构建说明见上游仓库。
 
-A real-time guitar effects processor for Android. Hosts 120+ LV2 audio plugins in a chainable rack interface with low-latency audio via Oboe and native plugin UIs rendered through a custom X11/EGL emulation layer.
+---
 
-It also includes **experimental** support for hosting Windows VST2/VST3 plugins (x86/x64) directly on-device via Wine + FEX emulation (see [Windows VST plugins](#windows-vst-plugins)).
+# Guitar RackCraft 使用说明
 
-![Screenshot](screenshot.png)
+欢迎使用 **Guitar RackCraft** —— 一款在手机上模拟吉他效果器与音箱，实时演奏、录音的吉他效果器 App。
+你可以像搭积木一样把失真、延迟、混响等效果器串联成一条“效果链”，调出属于自己的音色。
 
-## Features
+---
 
-- Chain multiple LV2 plugins with drag-and-drop reordering
-- Real-time audio processing with low-latency Oboe I/O
-- Native X11 plugin UIs rendered on Android via custom X11 server + EGL
-- Host Windows VST2/VST3 plugins (x86/x64) via Wine + FEX emulation - see [Windows VST plugins](#windows-vst-plugins)
-- Neural amp modeling (NAM, AIDA-X)
-- WAV file playback through the effects chain
-- Audio recording (raw input + processed output)
-- Preset save/restore
-- Song presets with bundled NAM models (see [Song presets](#song-presets))
-- Automatic disabling of OEM audio post-processing that distorts live guitar audio (Dolby/MiSound - see [OEM audio effects](#oem-audio-effects))
-- Adaptive latency tuning of the input buffer with xrun-driven backoff
+## 目录
 
-## Latency
+1. [应用简介](#一应用简介)
+2. [快速开始](#二快速开始)
+3. [主界面：效果链（Rack）](#三主界面效果链rack)
+4. [底部工具栏](#四底部工具栏)
+5. [插件浏览器：添加效果器](#五插件浏览器添加效果器)
+6. [调节参数（Modgui 控制界面）](#六调节参数modgui-控制界面)
+7. [预设系统](#七预设系统)
+8. [内置名曲预设](#八内置名曲预设)
+9. [音频设置](#九音频设置)
+10. [录音与回放](#十录音与回放)
+11. [语言切换](#十一语言切换)
+12. [常见问题（FAQ）](#十二常见问题faq)
 
-The audio path uses Oboe with AAudio, exclusive sharing mode and a `VoicePerformance`
-input preset. The output buffer is shrunk to one burst at startup. A background
-**latency tuner** keeps retrying to shrink the input buffer toward the burst size
-(some devices only allow it after the stream has been running for a while) and
-automatically relaxes it by one burst when xruns appear after a successful shrink.
+---
 
-Reported latency includes both the input and the output stream buffers, so the
-value shown in the UI reflects what you actually hear.
+## 一、应用简介
 
-> Note: some OEM audio policies (e.g. Xiaomi's MiAudioPolicyManager) enforce a
-> system-level minimum on the input buffer (4096 frames ≈ 85 ms @ 48 kHz) for
-> apps without special privileges. The tuner detects this and logs it; the only
-> remedy on such devices is a rooted ULL/RAW-flag patch (e.g. A2HHook).
+Guitar RackCraft 采用 **LV2 开源插件体系**，内置了 150+ 个由 Guitarix 等开源社区贡献的高质量效果器与音箱模拟插件，例如：
 
-## OEM audio effects
+- **音箱模拟**：GxAmplifier、GxMetalHead、GxBlueAmp 等
+- **失真 / 过载**：GxTubeScreamer（TS-9）、GxBoss DS1、GxBigMuffPi、MetalTone 等
+- **延迟 / 混响**：GxDelay-Stereo、GxTubeDelay、GxReverb-Stereo 等
+- **调制类**：GxChorus-Stereo、GxPhaser、GxFlanger、GxTremolo 等
+- **动态类**：GxCompressor、GxExpander、GxSlowGear（噪声门）等
+- **建模类**：Neural Amp Modeler、Neuralrack、ImpulseLoader（IR 加载）等
 
-Several vendors insert post-processing effects (Dolby "Music Listener",
-MiSound, Qualcomm volume listeners) on the app's output session. For music
-playback this is mostly harmless, but for a live instrument signal it causes
-pumping, distortion and audible clipping. On engine start the app binds to
-those effects on its own audio session and disables them.
+---
 
-## Song presets
+## 二、快速开始
 
-The bundled presets include full tone chains for well-known songs, each built
-around a complete "amp + cab + mic" NAM capture (from the free
-[pelennor2170/NAM_models](https://github.com/pelennor2170/NAM_models) collection).
-The `.nam` files are shipped in `assets/neural_models` and copied to app storage
-on first launch, so the presets work out of the box:
+1. **安装**：安装 APK 后首次打开，App 会把内置的插件资源解压到内部存储，请耐心等待进度条走完（视机型约 10–30 秒）。
+2. **授权麦克风**：首次使用会请求「录音」权限，用于吉他输入（3.5mm 接口、USB 声卡或手机麦克风）。请点击「允许」。
+3. **连接吉他**：
+   - 有外置声卡 / 音频接口：通过 OTG 转接线连接手机，然后在「设置」中选择对应的输入设备。
+   - 直接使用手机麦克风：也可以直接拾音演奏（适合练习与娱乐）。
+4. **开始演奏**：点击底栏的 ▶ 播放按钮启动音频引擎，对着设备弹奏即可听到经过效果链处理的音色。
 
-| Preset | Chain |
-|---|---|
-| Smoke on the Water (Deep Purple) | TS9 + Marshall-style NAM + reverb |
-| Master of Puppets (Metallica) | TS9 boost + 6505+ high-gain NAM + reverb |
-| Smells Like Teen Spirit (Nirvana) | Fuzz + Sovtek MIG50 NAM + chorus |
-| Sultans of Swing (Dire Straits) | Compressor + Fender Twin clean NAM |
-| Bohemian Rhapsody (Queen) | JCM2000 clean NAM + chorus + delay |
-| Europa (Santana) | Mesa Mark IV NAM + delay + reverb |
-| Paradise City (GNR) | TS9 + JCM2000 crunch NAM + delay + reverb |
-| ...and more | |
+> 提示：演奏时如果出现「噼啪」爆音或延迟过大，请到「设置」中调大缓冲大小（Buffer Size）。
 
-## Requirements
+---
 
-- Android 8.0+ (API 26), arm64-v8a
-- JDK 17
-- Android SDK (API 35, NDK 27.2.12479018, CMake 3.22.1)
-- System packages: `ninja-build meson python3 python3-mako pkg-config autoconf automake libtool gettext patch cmake flex bison ocaml ocamlbuild ocaml-findlib libnum-ocaml-dev`
+## 三、主界面：效果链（Rack）
 
-## Build
+打开 App 默认进入的就是「效果链」主界面。你设置的所有效果器会像真实吉他单块一样，从左到右排列成一条信号链：
 
-```bash
-# Initialize submodules
-git submodule update --init --recursive
-
-# Build native libraries
-./build.sh
-
-# Build and install debug APK
-./run.sh debug
-
-# Build release APK + AAB
-./run.sh release
-
-# Build Play Store AAB with asset packs
-./run.sh playstore
+```
+输入 → [效果器1] → [效果器2] → ... → [效果器N] → 输出
 ```
 
-### Build flavors
+### 3.1 顶部状态栏
 
-| Flavor | Description |
-|--------|-------------|
-| **full** | All plugins bundled in a single APK |
-| **playstore** | Plugins split into asset packs (gxplugins, neural, brummer) for Play Store delivery |
+- **运行状态**：显示音频引擎是否运行、延迟（毫秒）、CPU 占用，以及是否发生爆音（Xruns）。
+- **输入/输出电平表（VU）**：实时显示输入与输出音量，方便判断是否削波（过载爆音）。
+- **缓冲大小快捷切换**：点击顶部的「缓冲」标签可直接切换缓冲大小，无需进入设置页。
+- **右上角菜单**：包含 VST 管理、关于等入口。
 
-## Architecture
+### 3.2 插件卡片
 
-- **Kotlin/Compose** - Android UI layer
-- **C++17** - Audio engine, LV2 host, X11 server
-- **Oboe** - Low-latency audio I/O
-- **lilv** - LV2 plugin loading and management
-- **Cairo/Mesa** - 2D/3D rendering for plugin UIs
-- **X11 emulation** - Custom minimal X11 server bridging native plugin UIs to Android surfaces
+每个插件在效果链中显示为一张卡片，上面是插件的缩略图与名称。对卡片可以：
 
-See [3rd_party/README.md](3rd_party/README.md) for the full list of dependencies.
+| 操作 | 方法 |
+| --- | --- |
+| **打开控制界面** | 点击卡片，进入 Modgui 调节参数 |
+| **拖动排序** | 长按卡片左右拖动，改变信号处理顺序 |
+| **旁通 / 开启** | 卡片上有开关按钮，关闭后该效果器不参与处理（便于 A/B 对比） |
+| **删除** | 卡片上的删除按钮 |
+| **替换** | 在插件浏览器中可选择「替换」某个位置的插件 |
 
-## Windows VST plugins
+### 3.3 全屏模式
 
-In addition to the bundled LV2 plugins, the **full** flavor can host **Windows VST2/VST3**
-plugins (32-bit x86 and 64-bit x64) directly on Android - no PC required. Each plugin runs inside
-a bundled Windows compatibility layer:
+部分界面（如 Modgui）支持全屏显示，隐藏系统状态栏，获得更沉浸的调节体验。
 
-- **[Wine](https://www.winehq.org/)** provides the Win32 API and PE loader, so the plugin's `.dll` / `.vst3` loads unmodified.
-- **[FEX-Emu](https://fex-emu.com/)** JIT-translates the plugin's x86/x64 machine code to ARM64.
-- The plugin editor is bridged through the same custom X11 server onto an Android surface; **DXVK → Turnip** (Mesa Vulkan on Adreno) translates Direct3D 11 plugin GUIs.
+---
 
-Import a plugin with the in-app VST manager (point it at a `.dll` or `.vst3`). Imported plugins
-appear under the **Windows VST** group in the plugin browser - tagged with format (VST2/VST3) and
-architecture (x86/x64) badges - and chain alongside LV2 plugins like any other effect.
+## 四、底部工具栏
 
-> Windows VSTs run under emulation, so they use more CPU than native LV2 plugins, and plugins that
-> require online or hardware DRM activation may not work. The Windows VST host is built only in the
-> `full` flavor (`HAS_VST_HOST=true`); the `playstore` flavor omits it.
+主界面底部有 5 个核心功能按钮：
 
-## License
+| 按钮 | 功能 |
+| --- | --- |
+| **预设** | 打开预设面板：最近使用、全部预设、保存当前音色 |
+| **＋（添加）** | 打开插件浏览器，向效果链添加新效果器 |
+| **●（录音）** | 开始 / 停止录音，录制时显示已录时长 |
+| **♪（回放）** | 打开音频回放面板：加载 WAV 伴奏、播放 / 暂停 / 循环 / 拖动进度条 |
+| **▶ / ■（引擎）** | 启动 / 停止音频引擎 |
 
-GPLv3 - see [LICENSE](LICENSE).
+---
+
+## 五、插件浏览器：添加效果器
+
+点击底栏「＋」进入插件浏览器，从中挑选想要的效果器：
+
+1. **分类浏览**：插件按类型分组展示，如「失真」「延迟」「混响」「调制」等，方便快速定位。
+2. **搜索**：顶部搜索框可直接输入名称（中文或英文）查找插件。
+3. **收藏**：点击插件旁的星标可收藏，之后可在「收藏」分类中快速找到常用效果器。
+4. **添加 / 替换**：选择插件后确认，即可把新效果器添加到效果链末尾；也可以选择替换链中某个已有插件。
+
+> 部分插件需要加载外部文件才能工作，例如：
+> - **Neural Amp Modeler / Neuralrack**：需要加载 `.nam` / `.aidax` / `.json` 模型文件。
+> - **ImpulseLoader / PowerAmps 等**：需要加载 IR 脉冲响应文件（`.wav`）。
+> 点击这些插件上的文件选择按钮，可从设备存储或 Tone3000 云端选择模型。
+
+---
+
+## 六、调节参数（Modgui 控制界面）
+
+点击效果链中的插件卡片，会打开该插件的专属控制界面（Modgui），这里有该效果器的所有旋钮、开关：
+
+- **拖动旋钮**：上下或左右拖动即可调节参数，实时生效。
+- **滑块 / 开关**：部分参数以滑块或拨杆形式呈现。
+- **数值提示**：调节时会显示当前数值。
+- **模型 / IR 选择**：建模类插件提供「选择模型」按钮，可切换不同音色模型。
+
+常用音色速查（供参考）：
+
+| 目标 | 常用插件 | 建议参数方向 |
+| --- | --- | --- |
+| 清音 | GxAmplifier | 低 Drive（约 0.1–0.2）、高 Master |
+| 过载 | GxTubeScreamer | Drive 0.3–0.6、Tone 500–700 |
+| 失真 | GxMetalHead | DRIVE 0.6–0.9、TONE 0.4–0.5 |
+| 法兹 | GxFuzz / GxBigMuffPi | 拉高 DRIVE / SUSTAIN |
+| 空间感 | GxDelay + GxReverb | 延迟 300–500ms、混响 20–40% |
+
+---
+
+## 七、预设系统
+
+预设（Preset）可以把「当前整条效果链 + 所有参数」保存成一个文件，之后一键恢复，方便随时切换音色。
+
+### 7.1 打开预设面板
+
+点击底栏「预设」按钮。
+
+### 7.2 保存当前音色
+
+1. 在预设面板底部点击「保存当前效果链」。
+2. 输入预设名称，点击「保存」。
+3. 当前效果链会以该名称存入「全部预设」。
+
+### 7.3 加载预设
+
+- **最近使用**：面板顶部展示最近用过的预设，一键点击即恢复。
+- **全部预设**：点击任意预设即可加载，App 会先清空当前效果链，再按预设重建。
+- **清除最近**：点击「清除」可清空最近使用记录（不影响已保存的预设）。
+
+### 7.4 分享与删除
+
+- **分享**：点击预设右侧的分享图标，可把预设以 JSON 文本发送给朋友或保存到其他设备。
+- **删除**：点击删除图标移除该预设。
+
+> 预设以 `.json` 文件存放在 App 内部目录 `files/presets/` 中，删除后不可恢复，请谨慎操作。
+
+### 7.5 内置预设
+
+首次启动时，App 会自动导入随包附带的 **内置名曲预设**（见下一节），它们与普通预设一样可以直接加载。内置预设**不会覆盖**你手动保存的同名文件；即使你删除了某个内置预设，它也不会在下次启动时重新出现。
+
+---
+
+## 八、内置名曲预设
+
+App 预置了 14 个经典音色预设：**10 个著名歌曲** + **4 个当代吉他手**典型音色（均按原曲 / 本人常用设备风格手工调校，尽量贴近）：
+
+### 8.1 著名歌曲预设
+
+| 预设名称 | 原曲 | 艺术家 | 音色特点 |
+| --- | --- | --- | --- |
+| Smoke on the Water (Deep Purple) | Smoke on the Water | Deep Purple | 经典硬摇滚 Riff，TS-9 过载 + Marshall 式失真 |
+| Sweet Child O' Mine (Guns N' Roses) | Sweet Child O' Mine | Guns N' Roses | Slash 招牌主音，过载 + 合唱 + 延迟 |
+| Back in Black (AC/DC) | Back in Black | AC/DC | 高增益压缩摇滚节奏，干脆有力 |
+| Enter Sandman (Metallica) | Enter Sandman | Metallica | 金属失真 + 管味延迟 + 混响 |
+| Purple Haze (Jimi Hendrix) | Purple Haze | Jimi Hendrix | Fuzz 法兹 + 明亮音箱 + 轻微合唱 |
+| Hotel California (Eagles) | Hotel California | Eagles | 双吉他清音分解，合唱 + 延迟 |
+| Stairway to Heaven (Led Zeppelin) | Stairway to Heaven | Led Zeppelin | 清音分解 + 相位器 + 混响 |
+| Nothing Else Matters (Metallica) | Nothing Else Matters | Metallica | 清音拨弦 + 合唱 + 延迟 |
+| Comfortably Numb (Pink Floyd) | Comfortably Numb | Pink Floyd | 标志性长延迟 + 混响空间感 |
+| Beat It (Michael Jackson) | Beat It | Michael Jackson | 摇滚主音 + 合唱，明亮有穿透力 |
+
+### 8.2 当代吉他手预设
+
+| 预设名称 | 代表人物 | 音色特点 |
+| --- | --- | --- |
+| John Mayer - Gravity | John Mayer | 清音蓝调主音，轻过载 + 压缩 + 轻微回声，温暖厚实 |
+| Guthrie Govan - Wonderful Slippery Thing | Guthrie Govan | 融合爵士主音，中高增益 + 调制延迟，延音饱满有颗粒感 |
+| Stevie Ray Vaughan - Texas Flood | Stevie Ray Vaughan | 德州蓝调热音色，TS-9 推 Fender 式音箱，中频突出 |
+| Cory Wong - Funk | Cory Wong | 紧凑清音 Funk，强压缩 + 清音音箱，拨弦干脆明亮 |
+
+**使用方法**：点击底栏「预设」→ 在「全部预设」中找到对应名称并点击，即可一键加载该音色，然后直接演奏。
+
+> 说明：这些预设基于内置插件手工调校的近似音色，用于帮助快速上手；因设备、琴型与演奏方式不同，实际听感会有所差异，欢迎在此基础上继续微调，调好后再用「保存」保存成自己的音色。
+
+---
+
+## 九、音频设置
+
+点击主界面右上角菜单中的「设置」进入音频设置页：
+
+| 设置项 | 说明 |
+| --- | --- |
+| **输入设备** | 选择音频输入（外置声卡 / 麦克风 / 默认设备） |
+| **输出设备** | 选择音频输出（耳机 / 扬声器 / 蓝牙等） |
+| **缓冲大小** | 越小延迟越低但越容易爆音，越大越稳定但延迟更高，建议先自动再按需调整 |
+| **语言** | 切换界面语言：跟随系统 / 中文 / English |
+| **当前会话信息** | 实时显示采样率、缓冲帧数、Burst 等流信息 |
+| **低延迟清单** | 检查当前设备是否满足低延迟播放的各项指标（AAudio、独占模式、48kHz 等） |
+
+> 调音提示：先保证「采样率 48000 Hz」「输出独占模式」等低延迟项尽量打勾，再适当调小缓冲，可在稳定与延迟之间取得平衡。
+
+---
+
+## 十、录音与回放
+
+### 10.1 录音
+
+点击底栏的红色「●」按钮开始录音，再点一次（此时显示为 ■ 和已录时长）停止。录音文件保存后，可在「回放」面板中加载并试听。
+
+### 10.2 回放（伴奏播放）
+
+点击底栏「♪」打开回放面板：
+
+- **加载伴奏**：从设备选择 WAV 音频文件作为伴奏，边弹边放。
+- **加载录音**：选择自己录制的片段进行回放。
+- **播放控制**：播放 / 暂停、重新开始、停止、循环（Repeat）。
+- **效果处理**：可开关「经过效果链处理」——打开后伴奏也会经过当前效果链，用于练琴 / 演奏风格的试听对比。
+- **进度拖动**：拖动进度条可跳转到任意位置。
+
+---
+
+## 十一、语言切换
+
+App 支持 **中文 / 英文 / 跟随系统** 三种语言模式：
+
+1. 进入「设置」→「语言」。
+2. 选择「简体中文」「English」或「跟随系统」。
+3. 界面语言会即时切换，无需重启。
+
+> 中文界面覆盖了主界面、插件浏览器、分类、预设、设置、提示信息等主要部分；部分第三方插件自带的英文界面（Modgui）仍保持英文。
+
+---
+
+## 十二、常见问题（FAQ）
+
+**Q1：打开后一直停在「正在解压插件资源」？**
+首次启动需要解压约上百个 LV2 插件到内部存储，属于正常现象，请耐心等待。若长时间卡住，可尝试重新启动 App。
+
+**Q2：没有声音 / 声音很小？**
+- 确认底栏「▶」已启动（显示运行状态）。
+- 检查「设置」中输入 / 输出设备是否正确。
+- 检查效果链中是否有插件被误设为旁通（关闭）。
+- 检查输入电平表是否有信号；若设备无电平，请更换输入方式（如改用手机麦克风）。
+
+**Q3：有爆音 / 咔哒声？**
+在「设置」中增大缓冲大小，或检查低延迟清单，关闭不必要的后台应用。
+
+**Q4：延迟（感觉弹完才出声）太大？**
+在「设置」中减小缓冲大小；尽量使用有线耳机而非蓝牙耳机，蓝牙延迟较高。
+
+**Q5：预设加载后没有声音？**
+某些预设用到建模类插件（如 Neuralrack / ImpulseLoader），需要先为该插件选择对应的模型 / IR 文件，否则该插件不工作。请打开对应插件的控制界面加载模型。
+
+**Q6：找不到某个插件？**
+在插件浏览器中搜索英文名（例如 GxTubeScreamer）或中文名（如「过载」「延迟」）试试；也可以查看分类并收藏常用插件。
+
+**Q7：如何恢复被删除的内置预设？**
+内置预设只在首次启动时导入一次，删除后不会自动恢复。如需恢复，可卸载重装 App（会清空所有数据），或让朋友通过「分享」把预设发给你后再加载。
+
+---
+
+祝演奏愉快！如果在使用中遇到问题或有改进建议，欢迎随时反馈。
