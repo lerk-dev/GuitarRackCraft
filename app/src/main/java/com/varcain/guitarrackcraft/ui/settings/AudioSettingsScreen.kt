@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -44,6 +45,7 @@ import com.varcain.guitarrackcraft.engine.AudioEngine
 import com.varcain.guitarrackcraft.engine.AudioSettingsManager
 import com.varcain.guitarrackcraft.engine.LanguageManager
 import com.varcain.guitarrackcraft.ui.rack.RackViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,8 +60,18 @@ fun AudioSettingsScreen(
 
     var selectedInputId by remember { mutableIntStateOf(AudioSettingsManager.getInputDeviceId(context)) }
     var selectedOutputId by remember { mutableIntStateOf(AudioSettingsManager.getOutputDeviceId(context)) }
-    var selectedBufferSize by remember { mutableIntStateOf(AudioSettingsManager.getBufferSize(context)) }
+    var selectedBufferBursts by remember { mutableIntStateOf(AudioSettingsManager.getBufferBursts(context)) }
+    var selectedCushionMs by remember { mutableIntStateOf(AudioSettingsManager.getInputCushionMs(context)) }
     var refreshKey by remember { mutableIntStateOf(0) }
+
+    // Tiers depend on the device's burst: the 1x tier only appears when the
+    // burst is long enough to survive a single-burst buffer.
+    val burstTiers = remember(refreshKey) {
+        AudioSettingsManager.bufferBurstTiers(
+            AudioEngine.getStreamInfo().framesPerBurst,
+            AudioEngine.getSampleRate()
+        )
+    }
 
     BackHandler { onNavigateBack() }
 
@@ -114,12 +126,13 @@ fun AudioSettingsScreen(
                 }
             )
 
-            // Buffer size selector
-            BufferSizeDropdown(
-                selectedSize = selectedBufferSize,
-                onSelected = { size ->
-                    selectedBufferSize = size
-                    AudioSettingsManager.setBufferSize(context, size)
+            // Buffer tier selector (N x hardware burst)
+            BufferTierDropdown(
+                selectedBursts = selectedBufferBursts,
+                tiers = burstTiers,
+                onSelected = { bursts ->
+                    selectedBufferBursts = bursts
+                    AudioSettingsManager.setBufferBursts(context, bursts)
                     viewModel.restartEngine(context)
                     refreshKey++
                 }
@@ -131,12 +144,181 @@ fun AudioSettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            // Input cushion (extra input-side slack)
+            CushionDropdown(
+                selectedMs = selectedCushionMs,
+                onSelected = { ms ->
+                    selectedCushionMs = ms
+                    AudioSettingsManager.setInputCushionMs(context, ms)
+                    viewModel.restartEngine(context)
+                    refreshKey++
+                }
+            )
+
+            Text(
+                text = stringResource(R.string.settings_input_cushion_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Divider()
+
+            // --- Input gain & noise gate (pre-chain) ---
+            var preGainDb by remember { mutableFloatStateOf(AudioSettingsManager.getPreGainDb(context)) }
+            var gateThreshold by remember { mutableFloatStateOf(AudioSettingsManager.getGateThresholdDb(context)) }
+
+            Text(
+                text = stringResource(R.string.settings_input_section),
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            // Input pre-gain
+            Text(
+                text = stringResource(
+                    R.string.settings_input_gain,
+                    (if (preGainDb >= 0) "+" else "") + "%.1f".format(preGainDb)
+                ),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                value = preGainDb,
+                onValueChange = { preGainDb = (it * 2).roundToInt() / 2f },  // 0.5 dB steps
+                onValueChangeFinished = {
+                    AudioSettingsManager.setPreGainDb(context, preGainDb)
+                    if (AudioEngine.isRunning()) AudioEngine.setPreGainDb(preGainDb)
+                },
+                valueRange = -24f..24f
+            )
+
+            // Noise gate: all six parameters are live (no engine restart).
+            Text(
+                text = stringResource(R.string.settings_gate_section),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = if (gateThreshold <= -96f) stringResource(R.string.settings_gate_off)
+                else stringResource(R.string.settings_gate_threshold, "%.0f".format(gateThreshold)),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                value = if (gateThreshold <= -96f) AudioSettingsManager.GATE_RANGE.endInclusive
+                else gateThreshold.coerceIn(AudioSettingsManager.GATE_RANGE),
+                onValueChange = { gateThreshold = it },
+                onValueChangeFinished = {
+                    // Sliding fully right turns the gate off
+                    val effective = if (gateThreshold >= AudioSettingsManager.GATE_RANGE.endInclusive - 1f)
+                        AudioSettingsManager.GATE_OFF else gateThreshold
+                    gateThreshold = effective
+                    AudioSettingsManager.setGateThresholdDb(context, effective)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateThresholdDb(effective)
+                },
+                valueRange = AudioSettingsManager.GATE_RANGE,
+                // No steps: continuous, but the off region is the rightmost edge
+            )
+
+            var gateHysteresis by remember { mutableFloatStateOf(AudioSettingsManager.getGateHysteresisDb(context)) }
+            GateParamSlider(
+                label = stringResource(R.string.settings_gate_hysteresis, "%.1f".format(gateHysteresis)),
+                value = gateHysteresis,
+                range = AudioSettingsManager.GATE_HYSTERESIS_RANGE,
+                onValueChange = { gateHysteresis = it },
+                onValueChangeFinished = {
+                    AudioSettingsManager.setGateHysteresisDb(context, gateHysteresis)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateHysteresisDb(gateHysteresis)
+                }
+            )
+
+            var gateFloor by remember { mutableFloatStateOf(AudioSettingsManager.getGateFloorDb(context)) }
+            GateParamSlider(
+                label = stringResource(R.string.settings_gate_floor, "%.0f".format(gateFloor)),
+                value = gateFloor,
+                range = AudioSettingsManager.GATE_FLOOR_RANGE,
+                onValueChange = { gateFloor = it },
+                onValueChangeFinished = {
+                    AudioSettingsManager.setGateFloorDb(context, gateFloor)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateFloorDb(gateFloor)
+                }
+            )
+
+            var gateAttack by remember { mutableFloatStateOf(AudioSettingsManager.getGateAttackMs(context)) }
+            GateParamSlider(
+                label = stringResource(R.string.settings_gate_attack, "%.1f".format(gateAttack)),
+                value = gateAttack,
+                range = AudioSettingsManager.GATE_ATTACK_RANGE,
+                onValueChange = { gateAttack = it },
+                onValueChangeFinished = {
+                    AudioSettingsManager.setGateAttackMs(context, gateAttack)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateAttackMs(gateAttack)
+                }
+            )
+
+            var gateHold by remember { mutableFloatStateOf(AudioSettingsManager.getGateHoldMs(context)) }
+            GateParamSlider(
+                label = stringResource(R.string.settings_gate_hold, "%.0f".format(gateHold)),
+                value = gateHold,
+                range = AudioSettingsManager.GATE_HOLD_RANGE,
+                onValueChange = { gateHold = it },
+                onValueChangeFinished = {
+                    AudioSettingsManager.setGateHoldMs(context, gateHold)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateHoldMs(gateHold)
+                }
+            )
+
+            var gateRelease by remember { mutableFloatStateOf(AudioSettingsManager.getGateReleaseMs(context)) }
+            GateParamSlider(
+                label = stringResource(R.string.settings_gate_release, "%.0f".format(gateRelease)),
+                value = gateRelease,
+                range = AudioSettingsManager.GATE_RELEASE_RANGE,
+                onValueChange = { gateRelease = it },
+                onValueChangeFinished = {
+                    AudioSettingsManager.setGateReleaseMs(context, gateRelease)
+                    if (AudioEngine.isRunning()) AudioEngine.setGateReleaseMs(gateRelease)
+                }
+            )
+
+            Text(
+                text = stringResource(R.string.settings_input_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Divider()
+
+            // --- Post-chain output gain (master volume) ---
+            var outputGainDb by remember { mutableFloatStateOf(AudioSettingsManager.getOutputGainDb(context)) }
+
+            Text(
+                text = stringResource(R.string.settings_output_section),
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = stringResource(
+                    R.string.settings_output_gain,
+                    (if (outputGainDb >= 0) "+" else "") + "%.1f".format(outputGainDb)
+                ),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                value = outputGainDb,
+                onValueChange = { outputGainDb = (it * 2).roundToInt() / 2f },  // 0.5 dB steps
+                onValueChangeFinished = {
+                    AudioSettingsManager.setOutputGainDb(context, outputGainDb)
+                    if (AudioEngine.isRunning()) AudioEngine.setOutputGainDb(outputGainDb)
+                },
+                valueRange = -24f..24f
+            )
+            Text(
+                text = stringResource(R.string.settings_output_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             // Current engine info + low-latency checklist
             val isRunning by viewModel.isEngineRunning.collectAsState()
             if (isRunning) {
                 val sampleRate = remember(refreshKey) { AudioEngine.getSampleRate() }
-                val bufferFrames = remember(refreshKey) { AudioEngine.getBufferFrameCount() }
                 val streamInfo = remember(refreshKey) { AudioEngine.getStreamInfo() }
+                val stats = remember(refreshKey) { AudioEngine.getEngineStats() }
 
                 Divider()
                 Text(
@@ -145,9 +327,35 @@ fun AudioSettingsScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 InfoRow(stringResource(R.string.settings_sample_rate), "%.0f Hz".format(sampleRate))
-                InfoRow(stringResource(R.string.settings_buffer_size), "$bufferFrames frames")
+                InfoRow(
+                    stringResource(R.string.settings_buffer_bursts),
+                    "${selectedBufferBursts}× burst (${burstTierLabel(selectedBufferBursts)})"
+                )
                 InfoRow(stringResource(R.string.settings_burst_size), "${streamInfo.framesPerBurst} frames")
                 InfoRow(stringResource(R.string.settings_audio_format), stringResource(R.string.settings_32bit_float))
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Divider()
+                Text(
+                    text = stringResource(R.string.settings_engine_stats),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                InfoRow(stringResource(R.string.settings_callback_frames), "${stats.callbackFrames} frames")
+                InfoRow(
+                    stringResource(R.string.settings_output_buffer),
+                    "${stats.outputBufferFrames} / ${stats.outputBufferCapacityFrames} frames"
+                )
+                InfoRow(stringResource(R.string.settings_buffer_latency), "%.1f ms".format(
+                    if (sampleRate > 0f) stats.ringTargetFrames / sampleRate * 1000.0 else 0.0
+                ))
+                InfoRow(
+                    stringResource(R.string.settings_input_cushion_row),
+                    "${stats.inputCushionFrames} frames (${selectedCushionMs} ms)"
+                )
+                InfoRow(stringResource(R.string.settings_xruns), "${stats.xRuns}")
+                InfoRow(stringResource(R.string.settings_ring_overflows), "${stats.inputRingOverflows}")
+                InfoRow(stringResource(R.string.settings_output_underruns), "${stats.outputUnderruns}")
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Divider()
@@ -343,19 +551,21 @@ private fun DeviceDropdown(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BufferSizeDropdown(
-    selectedSize: Int,
+private fun BufferTierDropdown(
+    selectedBursts: Int,
+    tiers: List<Int>,
     onSelected: (Int) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val options = AudioSettingsManager.BUFFER_SIZE_OPTIONS
-    val autoLabel = stringResource(R.string.rack_buffer_auto)
-    val selectedLabel = if (selectedSize == 0) autoLabel
-        else options.find { it.first == selectedSize }?.second ?: autoLabel
+    val selectedLabel = stringResource(
+        R.string.settings_burst_tier_value,
+        burstTierLabel(selectedBursts),
+        selectedBursts
+    )
 
     Column {
         Text(
-            text = stringResource(R.string.settings_buffer_size),
+            text = stringResource(R.string.settings_buffer_bursts),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(bottom = 4.dp)
         )
@@ -376,11 +586,19 @@ private fun BufferSizeDropdown(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
-                options.forEach { (size, label) ->
+                tiers.forEach { bursts ->
                     DropdownMenuItem(
-                        text = { Text(if (size == 0) autoLabel else label) },
+                        text = {
+                            Text(
+                                stringResource(
+                                    R.string.settings_burst_tier_value,
+                                    burstTierLabel(bursts),
+                                    bursts
+                                )
+                            )
+                        },
                         onClick = {
-                            onSelected(size)
+                            onSelected(bursts)
                             expanded = false
                         }
                     )
@@ -389,3 +607,83 @@ private fun BufferSizeDropdown(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CushionDropdown(
+    selectedMs: Int,
+    onSelected: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            text = stringResource(R.string.settings_input_cushion),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            OutlinedTextField(
+                value = stringResource(R.string.settings_input_cushion_value, selectedMs),
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                AudioSettingsManager.CUSHION_CHOICES_MS.forEach { ms ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.settings_input_cushion_value, ms)) },
+                        onClick = {
+                            onSelected(ms)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Localized name of a buffer tier expressed as a multiple of the hardware burst. */
+@Composable
+private fun burstTierLabel(bursts: Int): String = stringResource(
+    when (bursts) {
+        1 -> R.string.settings_burst_tier_minimum
+        2 -> R.string.settings_burst_tier_lowest
+        4 -> R.string.settings_burst_tier_balanced
+        6 -> R.string.settings_burst_tier_steadier
+        8 -> R.string.settings_burst_tier_most_stable
+        else -> R.string.settings_burst_tier_balanced
+    }
+)
+
+@Composable
+private fun GateParamSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyMedium
+    )
+    Slider(
+        value = value.coerceIn(range),
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = range
+    )
+}
+
+

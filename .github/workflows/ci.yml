@@ -68,6 +68,48 @@ jobs:
           make -j$(nproc)
           ctest --output-on-failure
 
+  # Kotlin 单元测试 + Android Lint（playstore 变体：不依赖 :vsthost_lib
+  # 的 wine/FEX 预构建产物，纯 Gradle 即可跑通）。
+  lint-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Install Android SDK components
+        run: |
+          SDKMGR="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMGR" --licenses >/dev/null || true
+          for pkg in "platforms;android-35" "build-tools;34.0.0" \
+                     "cmake;3.22.1" "ndk;27.2.12479018"; do
+            "$SDKMGR" "$pkg" >/dev/null
+          done
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.gradle/build-cache
+          key: gradle-lint-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-lint-${{ runner.os }}-
+      - name: Unit tests + Lint (playstore debug)
+        run: ./gradlew :app:testPlaystoreDebugUnitTest :app:lintPlaystoreDebug
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-unit-reports-${{ github.sha }}
+          path: |
+            app/build/reports/lint-results-playstoreDebug.*
+            app/build/reports/tests/testPlaystoreDebug/
+            app/build/test-results/testPlaystoreDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
+
   keys:
     runs-on: ubuntu-latest
     timeout-minutes: 10

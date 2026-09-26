@@ -53,7 +53,6 @@
     <string name="rack_in">输入</string>
     <string name="rack_out">输出</string>
     <string name="rack_buffer">缓冲:</string>
-    <string name="rack_buffer_auto">自动</string>
     <string name="rack_more_options">更多选项</string>
     <string name="rack_settings">设置</string>
     <string name="rack_recordings">录音</string>
@@ -285,7 +284,31 @@
     <string name="settings_input_device">输入设备</string>
     <string name="settings_output_device">输出设备</string>
     <string name="settings_buffer_size">缓冲大小</string>
-    <string name="settings_buffer_hint">较小的缓冲区可降低延迟，但会增加 CPU 占用。除非遇到问题，建议使用自动。</string>
+    <string name="settings_buffer_hint">缓冲 = N × 硬件 burst，因此同一档位在任何设备上含义一致。默认使用「平衡」（4×），只有在听到断续时才需要往上调。</string>
+    <string name="settings_buffer_bursts">缓冲档位</string>
+    <string name="settings_burst_tier_minimum">最低</string>
+    <string name="settings_burst_tier_lowest">最低延迟</string>
+    <string name="settings_burst_tier_balanced">平衡</string>
+    <string name="settings_burst_tier_steadier">更稳定</string>
+    <string name="settings_burst_tier_most_stable">最稳定</string>
+    <string name="settings_burst_tier_value">%1$s（%2$d× burst）</string>
+    <string name="settings_input_cushion">输入垫层</string>
+    <string name="settings_input_cushion_value">%1$d 毫秒</string>
+    <string name="settings_input_cushion_hint">输入侧额外余量，用于吸收音频 HAL 调度抖动。只有在仅靠缓冲档位仍有爆音时才需要调高。</string>
+    <string name="settings_gate_section">噪声门</string>
+    <string name="settings_gate_hysteresis">迟滞：%1$s dB</string>
+    <string name="settings_gate_floor">关闭深度：%1$s dB</string>
+    <string name="settings_gate_attack">启动：%1$s 毫秒</string>
+    <string name="settings_gate_hold">保持：%1$s 毫秒</string>
+    <string name="settings_gate_release">释放：%1$s 毫秒</string>
+    <string name="settings_engine_stats">引擎诊断</string>
+    <string name="settings_callback_frames">回调块</string>
+    <string name="settings_output_buffer">输出缓冲</string>
+    <string name="settings_buffer_latency">缓冲延迟</string>
+    <string name="settings_input_cushion_row">输入垫层</string>
+    <string name="settings_xruns">欠载次数</string>
+    <string name="settings_ring_overflows">环形缓冲溢出</string>
+    <string name="settings_output_underruns">输出欠载</string>
     <string name="settings_default_device">默认</string>
     <string name="settings_current_session">当前会话</string>
     <string name="settings_sample_rate">采样率</string>
@@ -320,4 +343,41 @@
     <string name="model_picker_title_ir">选择脉冲响应</string>
     <string name="model_picker_title_neural">选择神经模型</string>
     <string name="model_picker_title_file">选择文件</string>
+
+    <!-- 调音表 -->
+    <string name="rack_tuner">调音表</string>
+    <string name="tuner_title">调音表</string>
+    <string name="tuner_play_a_note">弹响一个音</string>
+    <string name="tuner_nearest_string">最接近的琴弦：%1$s</string>
+    <string name="tuner_hint">参考音高 A4 = 440 Hz，适配任意乐器。</string>
+
+    <!-- 模型管理 -->
+    <string name="rack_models">模型管理</string>
+    <string name="models_title">模型管理</string>
+    <string name="models_import">导入</string>
+    <string name="models_imported">已导入 %1$d 个模型</string>
+    <string name="models_import_failed">导入失败</string>
+    <string name="models_empty">还没有模型。点击下方按钮导入 .nam / .json 模型文件。</string>
+    <string name="models_delete_title">删除模型？</string>
+    <string name="models_delete_text">“%1$s”将被删除，引用它的预设将失去该模型。</string>
+    <string name="models_delete_bundled_text">“%1$s”是名曲预设使用的内置模型，删除后这些预设可能失效，确定继续？</string>
+    <string name="models_apply">应用到效果链</string>
+    <string name="models_applied">已应用 %1$s</string>
+    <string name="models_no_plugin">效果链中没有 NAM 插件</string>
+    <string name="models_bundled">内置</string>
+    <string name="models_ir_enabled">IR 加载</string>
+    <string name="models_ir_enabled_hint">为纯箱头 NAM 模型启用箱体 IR。若模型已含箱体（完整整链采集），请关闭以避免双重滤波导致音色发闷。</string>
+    <string name="models_ir_disabled">IR 加载已关闭——请先在上方开启才能应用 IR 文件</string>
+
+    <!-- 输入增益与噪声门 -->
+    <string name="settings_input_section">输入增益与噪声门</string>
+    <string name="settings_input_gain">输入增益：%1$s dB</string>
+    <string name="settings_gate_threshold">噪声门阈值：%1$s dB</string>
+    <string name="settings_gate_off">噪声门：关闭</string>
+    <string name="settings_input_hint">增益作用于效果链之前，用于匹配你的吉他输出电平。噪声门会静音低于阈值的信号（滑到最右侧关闭）。</string>
+
+    <!-- 输出增益（主音量） -->
+    <string name="settings_output_section">输出（主音量）</string>
+    <string name="settings_output_gain">输出增益：%1$s dB</string>
+    <string name="settings_output_hint">作用于效果链之后，用于设定最终音量。如果输出听起来偏小，可在此提升。</string>
 </resources>

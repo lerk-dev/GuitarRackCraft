@@ -382,7 +382,7 @@ Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeRefreshPluginRegistry
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeStartEngine(JNIEnv* env, jobject thiz, jfloat sampleRate, jint inputDeviceId, jint outputDeviceId, jint bufferFrames) {
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeStartEngine(JNIEnv* env, jobject thiz, jfloat sampleRate, jint inputDeviceId, jint outputDeviceId, jint bufferBursts, jint inputCushionMs) {
     if (!g_ctx->audioEngine) {
         LOGE("Audio engine not initialized");
         return JNI_FALSE;
@@ -391,7 +391,8 @@ Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeStartEngine(JNIEnv* e
     return g_ctx->audioEngine->start(static_cast<float>(sampleRate),
                                      static_cast<int32_t>(inputDeviceId),
                                      static_cast<int32_t>(outputDeviceId),
-                                     static_cast<int32_t>(bufferFrames)) ? JNI_TRUE : JNI_FALSE;
+                                     static_cast<int32_t>(bufferBursts),
+                                     static_cast<int32_t>(inputCushionMs)) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
@@ -442,6 +443,38 @@ Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetStreamInfo(JNIEnv*
     jintArray result = env->NewIntArray(8);
     if (result) {
         env->SetIntArrayRegion(result, 0, 8, arr);
+    }
+    return result;
+}
+
+JNIEXPORT jintArray JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetEngineStats(JNIEnv* env, jobject thiz) {
+    // Returns [framesPerBurst, callbackFrames, outputBufferFrames,
+    //          outputBufferCapacityFrames, inputBufferFrames, inputCushionFrames,
+    //          ringTargetFrames, xruns, inputRingOverflows, outputUnderruns,
+    //          outputExclusive, inputExclusive, outputMMap, isAAudio]
+    jint arr[14] = {};
+    if (g_ctx->audioEngine && g_ctx->audioEngine->isRunning()) {
+        auto* engine = g_ctx->audioEngine.get();
+        auto info = engine->getStreamInfo();
+        arr[0] = engine->getFramesPerBurst();
+        arr[1] = static_cast<jint>(engine->getCallbackFrameCount());
+        arr[2] = engine->getOutputBufferFrames();
+        arr[3] = engine->getOutputBufferCapacityFrames();
+        arr[4] = engine->getInputBufferFrames();
+        arr[5] = engine->getInputCushionFrames();
+        arr[6] = engine->getRingTargetFrames();
+        arr[7] = engine->getXRunCount();
+        arr[8] = engine->getInputRingOverflows();
+        arr[9] = engine->getOutputUnderruns();
+        arr[10] = info.outputExclusive ? 1 : 0;
+        arr[11] = info.inputExclusive ? 1 : 0;
+        arr[12] = info.outputMMap ? 1 : 0;
+        arr[13] = info.isAAudio ? 1 : 0;
+    }
+    jintArray result = env->NewIntArray(14);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, 14, arr);
     }
     return result;
 }
@@ -516,6 +549,140 @@ Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeResetClipping(JNIEnv*
         g_ctx->audioEngine->resetClipping();
     }
 }
+
+// --- Pre-chain input gain + noise gate ---
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetPreGainDb(JNIEnv* env, jobject thiz, jfloat db) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setPreGainDb(db);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetPreGainDb(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 0.0f;
+    return g_ctx->audioEngine->getPreGainDb();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateThresholdDb(JNIEnv* env, jobject thiz, jfloat db) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateThresholdDb(db);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateThresholdDb(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return -120.0f;
+    return g_ctx->audioEngine->getGateThresholdDb();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateHysteresisDb(JNIEnv* env, jobject thiz, jfloat db) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateHysteresisDb(db);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateHysteresisDb(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 3.0f;
+    return g_ctx->audioEngine->getGateHysteresisDb();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateFloorDb(JNIEnv* env, jobject thiz, jfloat db) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateFloorDb(db);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateFloorDb(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return -80.0f;
+    return g_ctx->audioEngine->getGateFloorDb();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateAttackMs(JNIEnv* env, jobject thiz, jfloat ms) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateAttackMs(ms);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateAttackMs(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 5.0f;
+    return g_ctx->audioEngine->getGateAttackMs();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateHoldMs(JNIEnv* env, jobject thiz, jfloat ms) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateHoldMs(ms);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateHoldMs(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 50.0f;
+    return g_ctx->audioEngine->getGateHoldMs();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetGateReleaseMs(JNIEnv* env, jobject thiz, jfloat ms) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setGateReleaseMs(ms);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetGateReleaseMs(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 100.0f;
+    return g_ctx->audioEngine->getGateReleaseMs();
+}
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeSetOutputGainDb(JNIEnv* env, jobject thiz, jfloat db) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->setOutputGainDb(db);
+    }
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeGetOutputGainDb(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 0.0f;
+    return g_ctx->audioEngine->getOutputGainDb();
+}
+
+// --- Tuner ---
+
+JNIEXPORT void JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeTunerSetEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+    if (g_ctx->audioEngine) {
+        g_ctx->audioEngine->getTuner().setEnabled(enabled == JNI_TRUE);
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeTunerIsEnabled(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return JNI_FALSE;
+    return g_ctx->audioEngine->getTuner().isEnabled() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeTunerGetFrequency(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 0.0f;
+    return g_ctx->audioEngine->getTuner().getFrequency();
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_varcain_guitarrackcraft_engine_NativeEngine_nativeTunerGetClarity(JNIEnv* env, jobject thiz) {
+    if (!g_ctx->audioEngine) return 0.0f;
+    return g_ctx->audioEngine->getTuner().getClarity();
+}
+
 
 // Helper function to create PortInfo object (uses cached JNI refs)
 jobject createPortInfoObject(JNIEnv* env, const PortInfo& port) {

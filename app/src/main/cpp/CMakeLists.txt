@@ -154,9 +154,10 @@ add_library(utils STATIC
 
 # Audio engine
 add_library(audio_engine STATIC
-    engine/AudioEngine.cpp
-    engine/AudioRecorder.cpp
-    engine/OfflineProcessor.cpp
+	engine/AudioEngine.cpp
+	engine/AudioRecorder.cpp
+	engine/OfflineProcessor.cpp
+	engine/Tuner.cpp
 )
 target_link_libraries(audio_engine utils)
 

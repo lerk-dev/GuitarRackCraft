@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
@@ -114,6 +115,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.varcain.guitarrackcraft.engine.AudioEngine
 import com.varcain.guitarrackcraft.engine.AudioSettingsManager
 import com.varcain.guitarrackcraft.engine.RackManager
 import com.varcain.guitarrackcraft.engine.X11Bridge
@@ -241,6 +243,8 @@ fun RackScreen(
     onNavigateToRecordings: () -> Unit = {},
     onNavigateToTone3000: (String?, String?, String?, Int, String?) -> Unit = { _, _, _, _, _ -> },
     onNavigateToVstManager: () -> Unit = {},
+    onNavigateToTuner: () -> Unit = {},
+    onNavigateToModels: () -> Unit = {},
     onReplacePlugin: (Int) -> Unit = {},
     viewModel: RackViewModel = viewModel()
 ) {
@@ -257,13 +261,13 @@ fun RackScreen(
     }
 
     val context = LocalContext.current
-    var currentBufferSize by remember { mutableIntStateOf(AudioSettingsManager.getBufferSize(context)) }
+    var currentBufferBursts by remember { mutableIntStateOf(AudioSettingsManager.getBufferBursts(context)) }
 
     // Refresh when navigating back to this screen (isVisible changes to true)
     LaunchedEffect(isVisible) {
         if (isVisible) {
             viewModel.refreshRack()
-            currentBufferSize = AudioSettingsManager.getBufferSize(context)
+            currentBufferBursts = AudioSettingsManager.getBufferBursts(context)
         }
     }
 
@@ -476,9 +480,11 @@ fun RackScreen(
                                     viewModel.resetClipping()
                                 }
                         )
-                        // Quick buffer size selector
-                        val bufferLabel = AudioSettingsManager.BUFFER_SIZE_OPTIONS
-                            .find { it.first == currentBufferSize }?.second ?: stringResource(R.string.rack_buffer_auto)
+                        // Quick buffer tier selector (N x hardware burst)
+                        val bufferTiers = AudioSettingsManager.bufferBurstTiers(
+                            AudioEngine.getStreamInfo().framesPerBurst,
+                            AudioEngine.getSampleRate()
+                        )
                         Box {
                             var showBufferMenu by remember { mutableStateOf(false) }
                             Row(
@@ -494,7 +500,11 @@ fun RackScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = bufferLabel,
+                                    text = stringResource(
+                                        R.string.settings_burst_tier_value,
+                                        bufferTierShortLabel(currentBufferBursts),
+                                        currentBufferBursts
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
@@ -504,19 +514,23 @@ fun RackScreen(
                                 expanded = showBufferMenu,
                                 onDismissRequest = { showBufferMenu = false }
                             ) {
-                                AudioSettingsManager.BUFFER_SIZE_OPTIONS.forEach { (size, label) ->
+                                bufferTiers.forEach { bursts ->
                                     DropdownMenuItem(
                                         text = {
                                             Text(
-                                                label,
-                                                fontWeight = if (size == currentBufferSize) FontWeight.Bold else FontWeight.Normal
+                                                stringResource(
+                                                    R.string.settings_burst_tier_value,
+                                                    bufferTierShortLabel(bursts),
+                                                    bursts
+                                                ),
+                                                fontWeight = if (bursts == currentBufferBursts) FontWeight.Bold else FontWeight.Normal
                                             )
                                         },
                                         onClick = {
                                             showBufferMenu = false
-                                            if (size != currentBufferSize) {
-                                                currentBufferSize = size
-                                                AudioSettingsManager.setBufferSize(context, size)
+                                            if (bursts != currentBufferBursts) {
+                                                currentBufferBursts = bursts
+                                                AudioSettingsManager.setBufferBursts(context, bursts)
                                                 viewModel.restartEngine(context)
                                             }
                                         }
@@ -599,6 +613,34 @@ fun RackScreen(
                                         }
                                     )
                                 }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.rack_tuner)) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToTuner()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Speed,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.rack_models)) },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToModels()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.LibraryMusic,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.rack_about)) },
                                     onClick = {
@@ -3600,3 +3642,16 @@ fun AboutDialog(
         }
     )
 }
+
+/** Localized name of a buffer tier expressed as a multiple of the hardware burst. */
+@Composable
+private fun bufferTierShortLabel(bursts: Int): String = stringResource(
+    when (bursts) {
+        1 -> R.string.settings_burst_tier_minimum
+        2 -> R.string.settings_burst_tier_lowest
+        4 -> R.string.settings_burst_tier_balanced
+        6 -> R.string.settings_burst_tier_steadier
+        8 -> R.string.settings_burst_tier_most_stable
+        else -> R.string.settings_burst_tier_balanced
+    }
+)

@@ -34,6 +34,7 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.varcain.guitarrackcraft.ui.browser.PluginBrowserScreen
 import com.varcain.guitarrackcraft.ui.modgui.ModguiScreen
+import com.varcain.guitarrackcraft.ui.models.ModelManagerScreen
 import com.varcain.guitarrackcraft.ui.rack.RackScreen
 import com.varcain.guitarrackcraft.ui.vst.VST_MANAGER_ROUTE
 import com.varcain.guitarrackcraft.ui.vst.vstManagerRoute
@@ -43,6 +44,7 @@ import com.varcain.guitarrackcraft.ui.settings.AudioSettingsScreen
 import com.varcain.guitarrackcraft.ui.tone3000.Tone
 import com.varcain.guitarrackcraft.ui.tone3000.Tone3000Screen
 import com.varcain.guitarrackcraft.ui.tone3000.ToneDetailScreen
+import com.varcain.guitarrackcraft.ui.tuner.TunerScreen
 
 sealed class Screen(val route: String) {
     object Rack : Screen("rack")
@@ -54,6 +56,8 @@ sealed class Screen(val route: String) {
     }
     object Settings : Screen("settings")
     object Recordings : Screen("recordings")
+    object Tuner : Screen("tuner")
+    object Models : Screen("models")
     object Tone3000 : Screen("tone3000?tag={tag}&gear={gear}&platform={platform}&sourcePlugin={sourcePlugin}&sourceSlot={sourceSlot}") {
         fun route(tag: String? = null, gear: String? = null, platform: String? = null, sourcePluginIndex: Int = -1, sourceSlot: String? = null): String {
             val tagPart = tag?.let { "tag=$it" } ?: ""
@@ -102,6 +106,8 @@ fun AppNavigation(
                 navController.navigate(Screen.Tone3000.route(tag, gear, platform, sourcePluginIndex, sourceSlot))
             },
             onNavigateToVstManager = { navController.navigate(VST_MANAGER_ROUTE) },
+            onNavigateToTuner = { navController.navigate(Screen.Tuner.route) },
+            onNavigateToModels = { navController.navigate(Screen.Models.route) },
             onReplacePlugin = { replaceIndex ->
                 navController.navigate(Screen.Browser.route(replaceIndex))
             },
@@ -155,6 +161,16 @@ fun AppNavigation(
             composable(Screen.Settings.route) {
                 AudioSettingsScreen(
                     viewModel = rackViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Tuner.route) {
+                TunerScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Models.route) {
+                ModelManagerScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

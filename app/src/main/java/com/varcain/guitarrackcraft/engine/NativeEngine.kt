@@ -33,6 +33,24 @@ data class AudioStreamInfo(
     val framesPerBurst: Int = 0
 )
 
+/** Buffer/stream diagnostics shown in the audio settings panel. */
+data class EngineStats(
+    val framesPerBurst: Int = 0,
+    val callbackFrames: Int = 0,
+    val outputBufferFrames: Int = 0,
+    val outputBufferCapacityFrames: Int = 0,
+    val inputBufferFrames: Int = 0,
+    val inputCushionFrames: Int = 0,
+    val ringTargetFrames: Int = 0,
+    val xRuns: Int = 0,
+    val inputRingOverflows: Int = 0,
+    val outputUnderruns: Int = 0,
+    val outputExclusive: Boolean = false,
+    val inputExclusive: Boolean = false,
+    val outputMMap: Boolean = false,
+    val isAAudio: Boolean = false
+)
+
 /**
  * JNI bridge to the native audio engine.
  * Provides a Kotlin interface to the C++ audio processing engine.
@@ -123,9 +141,11 @@ class NativeEngine private constructor() {
     /**
      * Start the audio engine.
      * @param sampleRate Desired sample rate (will use device default if not supported)
+     * @param bufferBursts Output buffer size as a multiple of the hardware burst
+     * @param inputCushionMs Extra input-side slack in milliseconds
      * @return true if started successfully
      */
-    external fun nativeStartEngine(sampleRate: Float = 48000f, inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferFrames: Int = 0): Boolean
+    external fun nativeStartEngine(sampleRate: Float = 48000f, inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferBursts: Int = 4, inputCushionMs: Int = 0): Boolean
 
     /**
      * Stop the audio engine.
@@ -152,6 +172,15 @@ class NativeEngine private constructor() {
      * Returns [isAAudio, inputExclusive, outputExclusive, inputLowLatency, outputLowLatency, outputMMap, outputCallback, framesPerBurst]
      */
     external fun nativeGetStreamInfo(): IntArray
+
+    /**
+     * Get buffer/stream diagnostics for the engine panel.
+     * Returns [framesPerBurst, callbackFrames, outputBufferFrames,
+     *          outputBufferCapacityFrames, inputBufferFrames, inputCushionFrames,
+     *          ringTargetFrames, xruns, inputRingOverflows, outputUnderruns,
+     *          outputExclusive, inputExclusive, outputMMap, isAAudio]
+     */
+    external fun nativeGetEngineStats(): IntArray
 
     /**
      * Get current audio latency in milliseconds.
@@ -197,6 +226,52 @@ class NativeEngine private constructor() {
      * Clear clipping indicators.
      */
     external fun nativeResetClipping()
+
+    // --- Pre-chain input gain + noise gate ---
+
+    /** Input pre-gain in dB (-24..+24, 0 = unity). */
+    external fun nativeSetPreGainDb(db: Float)
+    external fun nativeGetPreGainDb(): Float
+
+    /** Noise gate threshold in dBFS (-120..-6). Values <= -96 disable the gate. */
+    external fun nativeSetGateThresholdDb(db: Float)
+    external fun nativeGetGateThresholdDb(): Float
+
+    /** Gate hysteresis above the threshold required to re-open (0..12 dB). */
+    external fun nativeSetGateHysteresisDb(db: Float)
+    external fun nativeGetGateHysteresisDb(): Float
+
+    /** Gain the gate closes down to (-100..-20 dB); never full silence. */
+    external fun nativeSetGateFloorDb(db: Float)
+    external fun nativeGetGateFloorDb(): Float
+
+    /** Gate envelope attack in ms (0.5..50). */
+    external fun nativeSetGateAttackMs(ms: Float)
+    external fun nativeGetGateAttackMs(): Float
+
+    /** Time below the threshold before the gate closes, in ms (0..500). */
+    external fun nativeSetGateHoldMs(ms: Float)
+    external fun nativeGetGateHoldMs(): Float
+
+    /** Gate gain close ramp in ms (10..1000). */
+    external fun nativeSetGateReleaseMs(ms: Float)
+    external fun nativeGetGateReleaseMs(): Float
+
+    /** Post-chain output gain (master volume) in dB (-24..+24, 0 = unity). */
+    external fun nativeSetOutputGainDb(db: Float)
+    external fun nativeGetOutputGainDb(): Float
+
+    // --- Tuner ---
+
+    /** Enable/disable the pitch detector (starts/stops its worker thread). */
+    external fun nativeTunerSetEnabled(enabled: Boolean)
+    external fun nativeTunerIsEnabled(): Boolean
+
+    /** Detected frequency in Hz; 0 when no reliable pitch. */
+    external fun nativeTunerGetFrequency(): Float
+
+    /** Detection clarity 0..1. */
+    external fun nativeTunerGetClarity(): Float
 
     /**
      * Get list of all available plugins.
@@ -433,8 +508,8 @@ class NativeEngine private constructor() {
     fun setChainBypass(bypass: Boolean) = nativeSetChainBypass(bypass)
     fun setWavBypassChain(bypass: Boolean) = nativeSetWavBypassChain(bypass)
 
-    fun startEngine(sampleRate: Float = 48000f, inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferFrames: Int = 0): Boolean {
-        return nativeStartEngine(sampleRate, inputDeviceId, outputDeviceId, bufferFrames)
+    fun startEngine(sampleRate: Float = 48000f, inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferBursts: Int = 4, inputCushionMs: Int = 0): Boolean {
+        return nativeStartEngine(sampleRate, inputDeviceId, outputDeviceId, bufferBursts, inputCushionMs)
     }
 
     fun stopEngine() {
@@ -461,6 +536,27 @@ class NativeEngine private constructor() {
         )
     }
 
+    fun getEngineStats(): EngineStats {
+        val arr = nativeGetEngineStats()
+        if (arr.size < 14) return EngineStats()
+        return EngineStats(
+            framesPerBurst = arr[0],
+            callbackFrames = arr[1],
+            outputBufferFrames = arr[2],
+            outputBufferCapacityFrames = arr[3],
+            inputBufferFrames = arr[4],
+            inputCushionFrames = arr[5],
+            ringTargetFrames = arr[6],
+            xRuns = arr[7],
+            inputRingOverflows = arr[8],
+            outputUnderruns = arr[9],
+            outputExclusive = arr[10] != 0,
+            inputExclusive = arr[11] != 0,
+            outputMMap = arr[12] != 0,
+            isAAudio = arr[13] != 0
+        )
+    }
+
     fun getLatencyMs(): Double {
         return nativeGetLatencyMs()
     }
@@ -473,6 +569,32 @@ class NativeEngine private constructor() {
     fun isInputClipping(): Boolean = nativeIsInputClipping()
     fun isOutputClipping(): Boolean = nativeIsOutputClipping()
     fun resetClipping() = nativeResetClipping()
+
+    // Pre-chain input gain + noise gate
+    fun setPreGainDb(db: Float) = nativeSetPreGainDb(db)
+    fun getPreGainDb(): Float = nativeGetPreGainDb()
+    fun setGateThresholdDb(db: Float) = nativeSetGateThresholdDb(db)
+    fun getGateThresholdDb(): Float = nativeGetGateThresholdDb()
+    fun setGateHysteresisDb(db: Float) = nativeSetGateHysteresisDb(db)
+    fun getGateHysteresisDb(): Float = nativeGetGateHysteresisDb()
+    fun setGateFloorDb(db: Float) = nativeSetGateFloorDb(db)
+    fun getGateFloorDb(): Float = nativeGetGateFloorDb()
+    fun setGateAttackMs(ms: Float) = nativeSetGateAttackMs(ms)
+    fun getGateAttackMs(): Float = nativeGetGateAttackMs()
+    fun setGateHoldMs(ms: Float) = nativeSetGateHoldMs(ms)
+    fun getGateHoldMs(): Float = nativeGetGateHoldMs()
+    fun setGateReleaseMs(ms: Float) = nativeSetGateReleaseMs(ms)
+    fun getGateReleaseMs(): Float = nativeGetGateReleaseMs()
+
+    // Post-chain output gain (master volume)
+    fun setOutputGainDb(db: Float) = nativeSetOutputGainDb(db)
+    fun getOutputGainDb(): Float = nativeGetOutputGainDb()
+
+    // Tuner
+    fun tunerSetEnabled(enabled: Boolean) = nativeTunerSetEnabled(enabled)
+    fun tunerIsEnabled(): Boolean = nativeTunerIsEnabled()
+    fun tunerGetFrequency(): Float = nativeTunerGetFrequency()
+    fun tunerGetClarity(): Float = nativeTunerGetClarity()
 
     fun getAvailablePlugins(): List<PluginInfo> {
         return nativeGetAvailablePlugins().toList()

@@ -141,8 +141,9 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         val ctx = getApplication<Application>()
         val inputId = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getInputDeviceId(ctx)
         val outputId = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getOutputDeviceId(ctx)
-        val bufSize = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getBufferSize(ctx)
-        startEngine(inputDeviceId = inputId, outputDeviceId = outputId, bufferFrames = bufSize)
+        val bursts = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getBufferBursts(ctx)
+        val cushionMs = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getInputCushionMs(ctx)
+        startEngine(inputDeviceId = inputId, outputDeviceId = outputId, bufferBursts = bursts, inputCushionMs = cushionMs)
         updateRackState()
 
         // Refresh rack state periodically to catch external changes
@@ -189,19 +190,32 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startEngine(inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferFrames: Int = 0) {
-        android.util.Log.i("AudioLifecycle", "RackViewModel.startEngine(input=$inputDeviceId, output=$outputDeviceId, buf=$bufferFrames) (thread=${Thread.currentThread().name})")
+    fun startEngine(inputDeviceId: Int = 0, outputDeviceId: Int = 0, bufferBursts: Int = 4, inputCushionMs: Int = 0) {
+        android.util.Log.i("AudioLifecycle", "RackViewModel.startEngine(input=$inputDeviceId, output=$outputDeviceId, bursts=$bufferBursts, cushionMs=$inputCushionMs) (thread=${Thread.currentThread().name})")
         viewModelScope.launch {
             try {
                 val started = AudioEngine.start(
                     inputDeviceId = inputDeviceId,
                     outputDeviceId = outputDeviceId,
-                    bufferFrames = bufferFrames
+                    bufferBursts = bufferBursts,
+                    inputCushionMs = inputCushionMs
                 )
                 android.util.Log.i("AudioLifecycle", "RackViewModel.startEngine() result=$started")
                 _isEngineRunning.value = started
                 if (started) {
                     _errorMessage.value = null
+                    // 恢复链首输入增益 + 噪声门 + 输出增益设置（对齐用户在设置页的保存值）
+                    val appCtx = getApplication<Application>().applicationContext
+                    com.varcain.guitarrackcraft.engine.AudioEngine.apply {
+                        setPreGainDb(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getPreGainDb(appCtx))
+                        setGateThresholdDb(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateThresholdDb(appCtx))
+                        setGateHysteresisDb(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateHysteresisDb(appCtx))
+                        setGateFloorDb(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateFloorDb(appCtx))
+                        setGateAttackMs(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateAttackMs(appCtx))
+                        setGateHoldMs(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateHoldMs(appCtx))
+                        setGateReleaseMs(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getGateReleaseMs(appCtx))
+                        setOutputGainDb(com.varcain.guitarrackcraft.engine.AudioSettingsManager.getOutputGainDb(appCtx))
+                    }
                     // 前台服务保活：切后台/锁屏后音频回调不被冻结
                     AudioForegroundService.start(getApplication())
                     // 禁用系统在输出会话上插入的音效（Dolby/MiSound 等）——
@@ -247,11 +261,12 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
         restartJob = viewModelScope.launch {
             val inputId = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getInputDeviceId(context)
             val outputId = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getOutputDeviceId(context)
-            val bufSize = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getBufferSize(context)
-            android.util.Log.i("AudioLifecycle", "RackViewModel.restartEngine(input=$inputId, output=$outputId, buf=$bufSize)")
+            val bursts = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getBufferBursts(context)
+            val cushionMs = com.varcain.guitarrackcraft.engine.AudioSettingsManager.getInputCushionMs(context)
+            android.util.Log.i("AudioLifecycle", "RackViewModel.restartEngine(input=$inputId, output=$outputId, bursts=$bursts, cushionMs=$cushionMs)")
             stopEngine()
             delay(100)
-            startEngine(inputDeviceId = inputId, outputDeviceId = outputId, bufferFrames = bufSize)
+            startEngine(inputDeviceId = inputId, outputDeviceId = outputId, bufferBursts = bursts, inputCushionMs = cushionMs)
         }
     }
 
@@ -417,6 +432,22 @@ class RackViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 com.varcain.guitarrackcraft.engine.NativeEngine.getInstance()
                     .setPluginFilePath(pluginIndex, propertyUri, filePath)
+                // Neuralrack runs NAM inference on the audio callback thread by default.
+                // Heavy models can overrun the callback budget on mid-range SoCs (e.g.
+                // Redmi K80) and cause periodic underruns -> intermittent crackling.
+                // Its "buffered" port (index 20) moves inference to a background thread,
+                // eliminating callback overruns at the cost of +1 block (~4 ms) latency.
+                if (propertyUri == "urn:brummer:neuralrack#Neural_Model") {
+                    RackManager.setParameter(pluginIndex, 20, 1f)
+                    // Enable input normalization for Slot A: NAM models expect a
+                    // hot input (near full-scale) but guitar pickups deliver
+                    // only ~-40..-20 dBFS. Without normalization the model runs
+                    // under-driven (thin, dull tone) while its internal gain
+                    // still amplifies the noise floor. Normalizing lifts the
+                    // input to the model's working level, improving tone and
+                    // signal-to-noise ratio (same approach as NAM droid).
+                    RackManager.setParameter(pluginIndex, 12, 1f)
+                }
             } catch (e: Exception) {
                 _errorMessage.value = ctx().getString(R.string.rack_err_set_file_path, e.message)
             }

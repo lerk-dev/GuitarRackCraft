@@ -51,7 +51,6 @@
     <string name="rack_in">In</string>
     <string name="rack_out">Out</string>
     <string name="rack_buffer">Buffer:</string>
-    <string name="rack_buffer_auto">Auto</string>
     <string name="rack_more_options">More options</string>
     <string name="rack_settings">Settings</string>
     <string name="rack_recordings">Recordings</string>
@@ -283,7 +282,31 @@
     <string name="settings_input_device">Input Device</string>
     <string name="settings_output_device">Output Device</string>
     <string name="settings_buffer_size">Buffer Size</string>
-    <string name="settings_buffer_hint">Lower buffer sizes reduce latency but increase CPU usage. Use Auto unless you experience issues.</string>
+    <string name="settings_buffer_hint">Buffer = N × the hardware burst, so a tier means the same latency on every device. Balanced (4×) is the default; raise it only if you hear dropouts.</string>
+    <string name="settings_buffer_bursts">Buffer Tiers</string>
+    <string name="settings_burst_tier_minimum">Minimum</string>
+    <string name="settings_burst_tier_lowest">Lowest Latency</string>
+    <string name="settings_burst_tier_balanced">Balanced</string>
+    <string name="settings_burst_tier_steadier">Steadier</string>
+    <string name="settings_burst_tier_most_stable">Most Stable</string>
+    <string name="settings_burst_tier_value">%1$s (%2$d× burst)</string>
+    <string name="settings_input_cushion">Input Cushion</string>
+    <string name="settings_input_cushion_value">%1$d ms</string>
+    <string name="settings_input_cushion_hint">Extra input-side slack that absorbs audio HAL scheduling jitter. Raise only if the buffer tier alone still crackles.</string>
+    <string name="settings_gate_section">Noise Gate</string>
+    <string name="settings_gate_hysteresis">Hysteresis: %1$s dB</string>
+    <string name="settings_gate_floor">Closed depth: %1$s dB</string>
+    <string name="settings_gate_attack">Attack: %1$s ms</string>
+    <string name="settings_gate_hold">Hold: %1$s ms</string>
+    <string name="settings_gate_release">Release: %1$s ms</string>
+    <string name="settings_engine_stats">Engine Diagnostics</string>
+    <string name="settings_callback_frames">Callback Block</string>
+    <string name="settings_output_buffer">Output Buffer</string>
+    <string name="settings_buffer_latency">Buffer Latency</string>
+    <string name="settings_input_cushion_row">Input Cushion</string>
+    <string name="settings_xruns">XRuns</string>
+    <string name="settings_ring_overflows">Ring Overflows</string>
+    <string name="settings_output_underruns">Output Underruns</string>
     <string name="settings_default_device">Default</string>
     <string name="settings_current_session">Current Session</string>
     <string name="settings_sample_rate">Sample Rate</string>
@@ -318,4 +341,41 @@
     <string name="model_picker_title_ir">Select Impulse Response</string>
     <string name="model_picker_title_neural">Select Neural Model</string>
     <string name="model_picker_title_file">Select File</string>
+
+    <!-- Tuner -->
+    <string name="rack_tuner">Tuner</string>
+    <string name="tuner_title">Tuner</string>
+    <string name="tuner_play_a_note">Play a note</string>
+    <string name="tuner_nearest_string">Nearest string: %1$s</string>
+    <string name="tuner_hint">Reference pitch A4 = 440 Hz. Works with any instrument.</string>
+
+    <!-- Model manager -->
+    <string name="rack_models">Model Manager</string>
+    <string name="models_title">Model Manager</string>
+    <string name="models_import">Import</string>
+    <string name="models_imported">Imported %1$d model(s)</string>
+    <string name="models_import_failed">Import failed</string>
+    <string name="models_empty">No models yet. Import .nam / .json model files with the button below.</string>
+    <string name="models_delete_title">Delete model?</string>
+    <string name="models_delete_text">"%1$s" will be deleted. Presets using it will fall back to their previous model.</string>
+    <string name="models_delete_bundled_text">"%1$s" is a built-in model used by the song presets. Deleting it may break those presets. Continue?</string>
+    <string name="models_apply">Apply to rack</string>
+    <string name="models_applied">Applied %1$s</string>
+    <string name="models_no_plugin">No NAM plugin found in the rack</string>
+    <string name="models_bundled">Built-in</string>
+    <string name="models_ir_enabled">IR loading</string>
+    <string name="models_ir_enabled_hint">Enable cab IR for head-only NAM models. Turn off for full-rig models that already include a cab.</string>
+    <string name="models_ir_disabled">IR loading is disabled — turn it on above to apply IR files</string>
+
+    <!-- Input gain & noise gate -->
+    <string name="settings_input_section">Input Gain &amp; Noise Gate</string>
+    <string name="settings_input_gain">Input gain: %1$s dB</string>
+    <string name="settings_gate_threshold">Gate threshold: %1$s dB</string>
+    <string name="settings_gate_off">Noise gate: off</string>
+    <string name="settings_input_hint">Gain is applied before the effect chain — use it to match your guitar\'s output level. The gate mutes signal below the threshold (slide fully right to turn it off).</string>
+
+    <!-- Post-chain output gain (master volume) -->
+    <string name="settings_output_section">Output (Master Volume)</string>
+    <string name="settings_output_gain">Output gain: %1$s dB</string>
+    <string name="settings_output_hint">Applied after the effect chain to set the final volume. Boost here if the output sounds too quiet.</string>
 </resources>

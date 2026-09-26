@@ -30,8 +30,66 @@
 #include <vector>
 #include "plugin/PluginChain.h"
 #include "AudioRecorder.h"
+#include "Tuner.h"
 
 namespace guitarrackcraft {
+
+/**
+ * Lock-free single-producer/single-consumer float ring buffer for the audio
+ * thread. The engine decouples input arrival from DSP consumption through this
+ * buffer (NAM Sandwich's approach): the Oboe callback drains the HAL input and
+ * pushes it here; the DSP side consumes fixed-size blocks whenever enough data
+ * is buffered, so an irregular HAL supply cadence (e.g. Redmi K80's 10-13ms
+ * input delivery period vs the 4ms callback block) can never starve or stall
+ * the plugin chain. Monotonic indices with modular access — safe because only
+ * the audio thread touches it and capacity is never exceeded.
+ */
+class AudioRingBuffer {
+public:
+    explicit AudioRingBuffer(size_t capacityFrames)
+        : buf_(capacityFrames, 0.0f) {}
+
+    void reset() { readIdx_ = writeIdx_ = 0; }
+    size_t readable() const { return writeIdx_ - readIdx_; }
+    size_t writable() const { return buf_.size() - readable(); }
+    size_t capacityFrames() const { return buf_.size(); }
+
+    void write(const float* src, size_t n) {
+        for (size_t i = 0; i < n; ++i) {
+            buf_[writeIdx_ % buf_.size()] = src[i];
+            ++writeIdx_;
+        }
+    }
+
+    void writeSilence(size_t n) {
+        for (size_t i = 0; i < n; ++i) {
+            buf_[writeIdx_ % buf_.size()] = 0.0f;
+            ++writeIdx_;
+        }
+    }
+
+    /** Write nFrames of interleaved stereo (2 floats per frame). Used by the
+     *  output ring so processed L/R never needs a separate interleave buffer. */
+    void writeInterleaved(const float* left, const float* right, size_t nFrames) {
+        for (size_t i = 0; i < nFrames; ++i) {
+            buf_[writeIdx_ % buf_.size()] = left[i];
+            buf_[(writeIdx_ + 1) % buf_.size()] = right[i];
+            writeIdx_ += 2;
+        }
+    }
+
+    void read(float* dst, size_t n) {
+        for (size_t i = 0; i < n; ++i) {
+            dst[i] = buf_[readIdx_ % buf_.size()];
+            ++readIdx_;
+        }
+    }
+
+private:
+    std::vector<float> buf_;
+    size_t readIdx_ = 0;
+    size_t writeIdx_ = 0;
+};
 
 /**
  * Audio engine using Oboe for low-latency audio I/O.
@@ -52,10 +110,13 @@ public:
     /**
      * Start audio processing.
      * @param sampleRate Desired sample rate (will use device default if not supported)
+     * @param bufferBursts Output buffer size as a multiple of the hardware burst
+     * @param inputCushionMs Extra input-side slack (ms) pre-filled into the input ring
      * @return true if started successfully
      */
     bool start(float sampleRate = 48000.0f, int32_t inputDeviceId = 0,
-               int32_t outputDeviceId = 0, int32_t bufferFrames = 0);
+               int32_t outputDeviceId = 0, int32_t bufferBursts = 4,
+               int32_t inputCushionMs = 0);
 
     /**
      * Stop audio processing.
@@ -127,6 +188,13 @@ public:
     int32_t getXRunCount() const;
 
     /**
+     * Safe MMAP check: oboe's OboeExtensions::isMMapUsed() casts the stream to
+     * AAudio internally and null-derefs if the stream ended up on OpenSL ES
+     * (the Huawei/Xiaomi exclusive-input fallback). Only meaningful for AAudio.
+     */
+    static int32_t isMMapUsedSafe(oboe::AudioStream* stream);
+
+    /**
      * Audio session id of the output stream (AAudio). Used by the Kotlin layer
      * to disable system post-processing effects (Dolby/MiSound) that OEM audio
      * policies insert on music streams and that badly distort guitar audio.
@@ -155,6 +223,56 @@ public:
      */
     void setChainBypass(bool bypass) { chainBypass_.store(bypass); }
     void setWavBypassChain(bool bypass) { wavBypassChain_.store(bypass); }
+
+    // --- Pre-chain input gain + noise gate ---
+    // Applied to the input buffer before metering and the plugin chain, so
+    // the input meter shows what actually hits the chain (gain staging).
+
+    /** Input pre-gain in dB, -24..+24 (0 = unity). */
+    void setPreGainDb(float db);
+    float getPreGainDb() const { return preGainDb_.load(); }
+
+    /** Noise gate threshold in dBFS, -80..-20; <= -96 disables the gate. */
+    void setGateThresholdDb(float db);
+    float getGateThresholdDb() const { return gateThresholdDb_.load(); }
+
+    /** Hysteresis above the threshold required to re-open the gate, 0..12 dB. */
+    void setGateHysteresisDb(float db);
+    float getGateHysteresisDb() const { return gateHysteresisDb_.load(); }
+
+    /** Gain the gate closes down to, -100..-20 dB (never full silence). */
+    void setGateFloorDb(float db);
+    float getGateFloorDb() const { return gateFloorDb_.load(); }
+
+    /** Envelope attack, 0.5..50 ms. Slow values reject sub-5ms input spikes. */
+    void setGateAttackMs(float ms);
+    float getGateAttackMs() const { return gateAttackMs_.load(); }
+
+    /** Time below the threshold before the gate closes, 0..500 ms. */
+    void setGateHoldMs(float ms);
+    float getGateHoldMs() const { return gateHoldMs_.load(); }
+
+    /** Gain close ramp time, 10..1000 ms. */
+    void setGateReleaseMs(float ms);
+    float getGateReleaseMs() const { return gateReleaseMs_.load(); }
+
+    // --- Stream/buffer diagnostics (UI panel) ---
+
+    int32_t getFramesPerBurst() const;
+    int32_t getOutputBufferFrames() const;
+    int32_t getOutputBufferCapacityFrames() const;
+    int32_t getInputBufferFrames() const;
+    int32_t getInputCushionFrames() const { return inputCushionFrames_; }
+    int32_t getRingTargetFrames() const { return ringTargetFrames_; }
+    int32_t getInputRingOverflows() const { return inputRingOverflowCount_.load(); }
+    int32_t getOutputUnderruns() const { return outputUnderrunCount_.load(); }
+
+    /** Post-chain output gain (master volume) in dB, -24..+24 (0 = unity). */
+    void setOutputGainDb(float db);
+    float getOutputGainDb() const { return outputGainDb_.load(); }
+
+    // --- Tuner ---
+    Tuner& getTuner() { return tuner_; }
 
     /**
      * Get the audio recorder for real-time recording of raw input and processed output.
@@ -204,15 +322,39 @@ private:
     float sampleRate_;
     int32_t inputDeviceId_ = 0;
     int32_t outputDeviceId_ = 0;
-    int32_t requestedBufferFrames_ = 0;
-    uint32_t callbackFrameCount_ = 0;  // Power-of-2 frames per audio callback
+    int32_t requestedBufferBursts_ = 4;  // output buffer = N x hardware burst
+    uint32_t callbackFrameCount_ = 0;  // frames per audio callback (= native burst)
     std::atomic<bool> isRunning_;
     std::atomic<bool> chainBypass_{false};  // skip chain processing (passthrough)
 
-    // Audio buffers for processing
-    std::vector<float> inputBuffer_;
-    std::vector<float> outputBufferLeft_;
-    std::vector<float> outputBufferRight_;
+    // DSP block buffers (audio thread). The Oboe callback decouples input
+    // arrival from plugin-chain consumption through inputRing_/outputRing_
+    // (see AudioRingBuffer above): input is pushed as it arrives, and the
+    // chain runs on fixed callback-sized blocks whenever enough data has
+    // accumulated. This absorbs irregular HAL input supply (10-13ms periods
+    // on some Xiaomi/Redmi devices) so the chain is never starved or gated
+    // by the input cadence — the primary cause of the intermittent "buzz"
+    // heard on the K80 even with silent input.
+    std::vector<float> processIn_;
+    std::vector<float> processOutLeft_;
+    std::vector<float> processOutRight_;
+    std::vector<float> processInterleaved_;  // mono-mix temp for mono output paths
+    /** inputRing_: mono frames of raw input as delivered by the HAL.
+     *  outputRing_: interleaved stereo floats (2 per frame) of processed audio. */
+    AudioRingBuffer inputRing_{16384};
+    AudioRingBuffer outputRing_{32768};
+    /** Output-side ring fill target (frames): the constant latency the DSP
+     *  path adds. Pre-filled at start() so the output never underflows while
+     *  the first input burst is still traveling through the HAL. */
+    int32_t ringTargetFrames_ = 0;
+    static constexpr float kRingTargetMs = 12.0f;
+    /** Extra input-side slack pre-filled into inputRing_ at start(), in frames.
+     *  Adds a fixed input latency that absorbs HAL scheduling jitter. */
+    int32_t inputCushionFrames_ = 0;
+    /** Diagnostics: input ring writes dropped (ring full) and output ring
+     *  underruns (silence substituted for processed audio). */
+    std::atomic<int32_t> inputRingOverflowCount_{0};
+    std::atomic<int32_t> outputUnderrunCount_{0};
     
     // Temporary buffers for plugin chain
     const float* inputPtrs_[2];
@@ -249,6 +391,48 @@ private:
     static constexpr float kClippingThreshold = 0.99f;
     static constexpr float kPeakDecay = 0.95f;
 
+    // Output soft limiter (audio thread): hot amp models (NAM) can push the
+    // chain output well past 1.0 and hard-clip at the DAC. Duck with a
+    // fast-attack / slow-release gain so overs never reach the hardware.
+    static constexpr float kLimiterCeiling = 0.98f;
+    static constexpr float kLimiterAttack = 0.3f;   // per-block gain step down
+    static constexpr float kLimiterRelease = 0.01f; // per-block gain step up (fast enough to avoid pumping on sustained notes)
+    float limiterGain_{1.0f};
+
+    // Pre-chain input gain + noise gate state (audio thread)
+    std::atomic<float> preGainDb_{0.0f};
+    std::atomic<float> gateThresholdDb_{-60.0f};  // <= -96 dB: gate disabled
+    std::atomic<float> gateHysteresisDb_{3.0f};   // open needs threshold + N dB
+    std::atomic<float> gateFloorDb_{-80.0f};      // gain when closed (never 0)
+    std::atomic<float> gateAttackMs_{5.0f};       // envelope attack
+    std::atomic<float> gateHoldMs_{50.0f};        // below threshold this long before closing
+    std::atomic<float> gateReleaseMs_{100.0f};    // gain close ramp
+    float preGainLin_{1.0f};       // cached linear gain (audio thread only)
+    float preGainDbCached_{0.0f};  // dB value preGainLin_ was computed from
+    float gateEnv_{0.0f};          // peak envelope follower for the gate
+    float gateGain_{1.0f};         // smoothed gate open/close gain
+    // Gate hysteresis + hold: the gate only closes when the envelope stays
+    // below the close threshold for a full hold window. Opening requires the
+    // envelope to rise gateHysteresisDb_ above the threshold. This stops the
+    // gate from flapping (buzz) or abruptly cutting a naturally decaying note.
+    // The hold window is deliberately short: 400ms let a decaying note fall
+    // below the threshold while the gate stayed fully open — on a high-gain NAM
+    // the amplified floor noise kept passing for the whole window, sounding like
+    // a burst of noise for ~0.5s after the player stops picking. 50ms is still
+    // longer than a string's natural decay down to the threshold, so sustained
+    // notes are not chopped, but the noise tail after stopping is inaudible.
+    bool gateOpen_{false};
+    int32_t gateHoldFrames_{0};
+    void applyPreGainAndGate(float* buf, int32_t numFrames);
+
+    // Post-chain output gain (master volume) state (audio thread)
+    std::atomic<float> outputGainDb_{0.0f};
+    float outputGainLin_{1.0f};       // cached linear gain (audio thread only)
+    float outputGainDbCached_{0.0f};  // dB value outputGainLin_ was computed from
+
+    // Tuner: fed from the audio callback, analyzed on its own worker thread
+    Tuner tuner_;
+
     // WAV playback state (read in callback; written from load/seek/play/pause)
     std::vector<float> wavBuffer_;
     std::atomic<size_t> wavPositionFrames_{0};
@@ -261,10 +445,19 @@ private:
     // Adaptive latency tuner (Amp Rack / LatencyTuner approach): periodically
     // retries shrinking the input buffer toward the burst size — some devices
     // only accept it once the stream has been running for a while — and backs
-    // off by one burst when new xruns appear after a shrink.
+    // off by one burst when new xruns appear after a shrink. Also keeps
+    // retrying the output shrink: on non-MMAP paths the system can hand out a
+    // huge burst (e.g. 3844 frames ≈ 80ms) that equals the initial buffer
+    // size, so the one-shot create-time shrink would never fire.
     std::thread latencyTunerThread_;
     std::atomic<bool> latencyTunerRunning_{false};
     std::atomic<int32_t> tunerXrunsAtShrink_{-1};
+    bool outputTuned_ = false;
+    bool inputTuned_ = false;
+    int outputClampStreak_ = 0;   // consecutive system-clamped output shrinks
+    int inputClampStreak_ = 0;    // consecutive system-clamped input shrinks
+    int32_t lastMonitoredXruns_ = -1;  // xrun baseline for the underrun monitor
+    static constexpr int32_t kMaxTunerBufferFrames = 1024;
     void latencyTunerLoop();
 
     bool createAudioStreams(float sampleRate);
